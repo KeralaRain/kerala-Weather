@@ -234,6 +234,11 @@ def init_database():
     global _DB_READY
     if _DB_READY:
         return
+    with engine.begin() as _conn:
+        _conn.execute(text("CREATE TABLE IF NOT EXISTS imd_master_history (year INT, month INT, imd_normal_mm REAL, imd_actual_mm REAL, data_source TEXT, PRIMARY KEY (year, month))"))
+        _conn.execute(text("CREATE TABLE IF NOT EXISTS kurma_sectors_dams (sector_id INT PRIMARY KEY, sector_name TEXT, nakshatras TEXT, river_basins TEXT, major_dams TEXT)"))
+        _conn.execute(text("CREATE TABLE IF NOT EXISTS rainfall_predictions (year INT, sector_id INT, month INT, score_1_to_10 INT, predicted_mm REAL, predicted_l_per_m2 REAL, departure_pct REAL, astro_notes TEXT, PRIMARY KEY (year, sector_id, month))"))
+    ensure_all_domain_tables()
     try:
         with engine.connect() as c:
             cnt = c.execute(text("SELECT COUNT(*) FROM rainfall_predictions WHERE sector_id = 0 AND year = 2027")).scalar()
