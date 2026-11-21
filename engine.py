@@ -11,9 +11,20 @@ from sklearn.model_selection import GroupKFold, cross_val_predict
 swe.set_sid_mode(swe.SIDM_LAHIRI)
 
 def get_engine():
-    pg_url = os.getenv("DATABASE_URL", "postgresql://jyotisha:monsoon2026@localhost:5432/monsoon_jyotisha")
+    pg_url = os.getenv("DATABASE_URL", "")
+    if pg_url:
+        try:
+            eng = create_engine(pg_url, connect_args={"connect_timeout": 2})
+            with eng.connect() as c:
+                c.execute(text("SELECT 1"))
+            return eng, "postgresql"
+        except Exception:
+            pass
+    repo_db = os.path.join(os.path.dirname(os.path.abspath(__file__)), "monsoon_jyotisha.db")
+    if os.path.exists(repo_db):
+        return create_engine(f"sqlite:///{repo_db}"), "sqlite"
     try:
-        eng = create_engine(pg_url, connect_args={"connect_timeout": 2})
+        eng = create_engine("postgresql://jyotisha:monsoon2026@localhost:5432/monsoon_jyotisha", connect_args={"connect_timeout": 1})
         with eng.connect() as c:
             c.execute(text("SELECT 1"))
         return eng, "postgresql"
@@ -164,7 +175,7 @@ def get_swati_pravesha(year):
     return False, "Unknown", 0.0
 
 _V6_MODEL = None
-_MODEL_CACHE_PATH = os.path.join(os.path.expanduser("~"), ".monsoon_jyotisha", "v6_models_v10.joblib")
+_MODEL_CACHE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "v6_models_v10.joblib")
 
 def get_v6_model():
     global _V6_MODEL
@@ -286,7 +297,7 @@ def predict_and_cache_year(target_year):
             feat, notes, canc, pisc, r_st = extract_month_features(target_year, m, ardra_info)
             st_norm = NORMALS.get(m)
             if model is not None:
-                st_pred = round(max(0.0, float(np.expm1(next(iter(model.predict(np.array((feat,)))))))), 1)
+                st_pred = round(predict_month_mm(model, feat, m), 1)
             else:
                 st_pred = st_norm
             st_sc = to_scale(st_norm, st_pred)
