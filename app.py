@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import pydeck as pdk
 from sqlalchemy import text
-from engine import engine, DB_BACKEND, NORMALS, to_scale, init_database, predict_and_cache_year
+from engine import engine, DB_BACKEND, NORMALS, to_scale, init_database, predict_and_cache_year, get_historical_backtest
 
 st.set_page_config(page_title="Monsoon prediction For Kerala :- Astro-Meteorological Forecasting System", layout="wide")
 init_database()
@@ -15,7 +15,7 @@ with st.sidebar:
     sel_year = st.number_input("Select Target Year (1901–2100)", min_value=1901, max_value=2100, value=2027, step=1)
     if st.button("Compute & Cache Selected Year"):
         with st.spinner(f"Running V4 Ephemeris Engine for {sel_year}..."):
-            predict_and_cache_year(int(sel_year))
+            predict_and_cache_year, get_historical_backtest(int(sel_year))
         st.success(f"Year {sel_year} computed and stored in PostgreSQL!")
 
     st.divider()
@@ -23,7 +23,7 @@ with st.sidebar:
     st.info(f"**Database Engine:** {db_label}")
     st.markdown("**Pre-Cached Years in DB:** 2026–2030 + 1975–2026 IMD Actuals")
 
-predict_and_cache_year(int(sel_year))
+predict_and_cache_year, get_historical_backtest(int(sel_year))
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "1. General Kerala Annual",
@@ -132,6 +132,15 @@ with tab5:
         SELECT * FROM imd_master_history WHERE year BETWEEN :y1 AND :y2 ORDER BY year DESC, month ASC
     """), engine, params={"y1": yr_filter[0], "y2": yr_filter[1]})
     st.dataframe(df_hist, use_container_width=True)
+    st.divider()
+    st.subheader("V5 Engine 50-Year Historical Backtest (1975–2026)")
+    if st.button("Run 50-Year IMD Accuracy Validation"):
+        with st.spinner("Computing 52 years of Sidereal Ephemeris + Ardra Pravesha charts..."):
+            df_bt = get_historical_backtest(1975, 2026)
+        avg_acc = round(float(df_bt["Accuracy_pct"].mean()), 1)
+        st.metric("52-Year Mean Forecast Accuracy (1975–2026)", f"{avg_acc}%", "Validated against Kerala IMD Actuals")
+        st.line_chart(df_bt.set_index("Year")[["IMD_Actual_mm", "V5_Astro_Pred_mm"]], use_container_width=True)
+        st.dataframe(df_bt.sort_values("Year", ascending=False), use_container_width=True, hide_index=True)
 
 import io
 with st.sidebar:
