@@ -8,3 +8,4 @@ openpyxl
 pydeck
 pydeck
 pydeck
+scikit-learn
