@@ -5,8 +5,6 @@ import numpy as np
 import pandas as pd
 import swisseph as swe
 from sqlalchemy import create_engine, text
-from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.model_selection import GroupKFold, cross_val_predict
 
 swe.set_sid_mode(swe.SIDM_LAHIRI)
 
@@ -178,6 +176,7 @@ _V6_MODEL = None
 _MODEL_CACHE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "v6_models_v10.joblib")
 
 def get_v6_model():
+    from sklearn.ensemble import GradientBoostingRegressor
     global _V6_MODEL
     if _V6_MODEL is not None:
         return _V6_MODEL
@@ -238,6 +237,15 @@ def predict_month_mm(model_pack, feat, month):
     return max(0.0, base_p)
 
 def init_database():
+    ensure_all_domain_tables()
+    try:
+        with engine.connect() as c:
+            cnt = c.execute(text("SELECT COUNT(*) FROM rainfall_predictions WHERE sector_id = 0 AND year = 2027")).scalar()
+            if cnt and int(cnt) == 12:
+                return
+    except Exception:
+        pass
+
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "schema.sql")) as f:
         sql_script = f.read()
     with engine.begin() as conn:
@@ -317,6 +325,8 @@ def predict_and_cache_year(target_year):
                 conn.execute(text("INSERT INTO rainfall_predictions (year, month, sector_id, score_1_to_10, predicted_mm, predicted_l_per_m2, departure_pct, astro_notes) VALUES (:y, :m, :sid, :s, :p, :l, :d, :nt) ON CONFLICT DO NOTHING"), {"y":target_year,"m":m,"sid":sid,"s":f_sc,"p":sp,"l":sp,"d":sd,"nt":notes})
 
 def get_historical_backtest(start_yr=1975, end_yr=2026):
+    from sklearn.ensemble import GradientBoostingRegressor
+    from sklearn.model_selection import GroupKFold, cross_val_predict
     model_pair = get_v6_model()
     with engine.connect() as conn:
         df_all = pd.read_sql(text("SELECT year, month, imd_actual_mm FROM imd_master_history ORDER BY year, month"), conn)
@@ -1136,6 +1146,8 @@ def get_analog_years(target_year, top_n=5):
 
 _raw_backtest = get_historical_backtest
 def get_historical_backtest(start_yr=1975, end_yr=2026):
+    from sklearn.ensemble import GradientBoostingRegressor
+    from sklearn.model_selection import GroupKFold, cross_val_predict
     ensure_all_domain_tables()
     with engine.connect() as conn:
         df = pd.read_sql(text('SELECT year AS "Year", ardra_moon AS "Ardra_Moon", swati_moon AS "Swati_Moon", imd_actual_mm AS "IMD_Actual_mm", v6_insample_mm AS "V6_InSample_mm", insample_fit_pct AS "InSample_Fit_pct", v6_blind_oos_mm AS "V6_Blind_OOS_mm", blind_oos_acc_pct AS "Blind_OOS_Acc_pct", sw_acc_pct AS "SW_Acc_pct", thulavarsham_actual_mm AS "Thulavarsham_Actual_mm", thulavarsham_pred_mm AS "Thulavarsham_Pred_mm", thulavarsham_acc_pct AS "Thulavarsham_Acc_pct", summer_acc_pct AS "Summer_Acc_pct", winter_acc_pct AS "Winter_Acc_pct" FROM backtest_validation_history WHERE year BETWEEN :y1 AND :y2 ORDER BY year'), conn, params={"y1": int(start_yr), "y2": int(end_yr)})

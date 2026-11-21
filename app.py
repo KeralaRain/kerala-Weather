@@ -2,7 +2,6 @@ import io
 import datetime
 import streamlit as st
 import pandas as pd
-import pydeck as pdk
 from sqlalchemy import text
 from engine import (
     engine, DB_BACKEND, NORMALS, to_scale, init_database, predict_and_cache_year,
@@ -155,6 +154,7 @@ elif active_tab == "🌊 Rain: Dam Catchments & Map":
     st.dataframe(df_dams, use_container_width=True)
     st.markdown("##### Annual Catchment Volume by Sector (mm / L per m²)")
     st.bar_chart(df_dams.set_index("sector_name")["annual_catchment_mm"], use_container_width=True)
+    import pydeck as pdk
     st.markdown("##### Interactive Kerala Kurma Sectors & Major Dams Map")
     coords = {1:(10.53,76.21), 2:(9.85,76.98), 3:(10.83,76.68), 4:(9.34,77.15), 5:(8.53,77.15), 6:(9.62,76.38), 7:(11.12,76.12), 8:(11.98,75.56), 9:(11.65,75.96)}
     df_map = df_dams.copy()
