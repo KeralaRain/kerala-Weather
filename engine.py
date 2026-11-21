@@ -225,7 +225,7 @@ def init_database():
 
         cnt = conn.execute(text("SELECT COUNT(*) FROM imd_master_history")).scalar()
         if cnt < 1500:
-            csv_path = os.path.join(os.path.dirname(os.path.abspath(file)), "kerala_imd_1901_2018.csv")
+            csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "kerala_imd_1901_2018.csv")
             m_cols = ("JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC")
             if os.path.exists(csv_path):
                 df_csv = pd.read_csv(csv_path)

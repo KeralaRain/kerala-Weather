@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import pydeck as pdk
 from sqlalchemy import text
-from engine import engine, DB_BACKEND, NORMALS, to_scale, init_database, predict_and_cache_year, get_historical_backtest, get_njattuvela_forecast, get_extreme_year_profile, get_temperature_forecast, get_daily_astro_weather, get_vishu_ingress, get_month_daily_split
+from engine import engine, DB_BACKEND, NORMALS, to_scale, init_database, predict_and_cache_year, get_historical_backtest, get_njattuvela_forecast, get_extreme_year_profile, get_temperature_forecast, get_daily_astro_weather, get_vishu_ingress, get_month_daily_split, get_intraday_prahara_curve, get_month_all_praharas, get_astronomical_metrics, get_analog_years, fetch_live_kerala_nwp, fetch_7month_seasonal_forecast
 
 st.set_page_config(page_title="Monsoon Prediction For Kerala :- Astro-Meteorological Forecasting System", page_icon="🌧️", layout="wide")
 st.markdown("<style>div[data-baseweb='tab-list'] { flex-wrap: wrap; row-gap: 6px; }</style>", unsafe_allow_html=True)
@@ -342,7 +342,7 @@ with tab8:
     d4.metric("Lunar Tithi", d_info["tithi"], "Panchanga Phase")
     d5.metric("Wind Speed", f"{d_info['wind_kmh']} km/h", d_info["wind_status"])
     st.markdown(f"##### 3-Hour Intra-Day Prahara & Lagna Curve for {d_info['date']} (IST)")
-    df_intra = get_intraday_prahara_curve, get_month_all_praharas, get_astronomical_metrics, get_analog_years, fetch_live_kerala_nwp, fetch_7month_seasonal_forecast(pick_date, int(sel_sec))
+    df_intra = get_intraday_prahara_curve(pick_date, int(sel_sec))
     st.line_chart(df_intra.set_index("Time_IST")[["Temp_C", "Rain_mm"]], color=["#FF4B4B", "#0077B6"], use_container_width=True)
     st.dataframe(df_intra, use_container_width=True, hide_index=True)
 
@@ -352,7 +352,7 @@ with tab8:
     c_mp1, c_mp2 = st.columns(2)
     mp_year = c_mp1.number_input("Schedule Year:", min_value=1901, max_value=2100, value=2026, step=1)
     mp_month = c_mp2.selectbox("Schedule Month:", list(range(1, 13)), index=10, format_func=lambda m: f"Month {m:02d}")
-    df_mp = get_month_all_praharas, get_astronomical_metrics, get_analog_years, fetch_live_kerala_nwp, fetch_7month_seasonal_forecast(int(mp_year), int(mp_month), int(sel_sec))
+    df_mp = get_month_all_praharas(int(mp_year), int(mp_month), int(sel_sec))
     df_mp["Slot_Label"] = df_mp["Date"] + " " + df_mp["Time_IST"].str.slice(0, 5)
     st.line_chart(df_mp.set_index("Slot_Label")[["Temp_C", "Rain_mm"]], color=["#FF4B4B", "#0077B6"], use_container_width=True)
     st.markdown("##### Day-by-Day Temperature Grid Across All 8 Times of Day (°C)")
@@ -410,7 +410,7 @@ with tab9:
     }
     sel_city = st.selectbox("Select Kerala Station for Live 14-Day NWP Model:", list(city_map.keys()))
     lat_c, lon_c = city_map.get(sel_city)
-    df_nwp, online_ok = fetch_live_kerala_nwp, fetch_7month_seasonal_forecast(lat_c, lon_c)
+    df_nwp, online_ok = fetch_live_kerala_nwp(lat_c, lon_c)
     if online_ok and not df_nwp.empty:
         st.success(f"Connected to Live Open-Meteo Global NWP Feed for **{sel_city}** (Next 14 Days)")
         st.line_chart(df_nwp.set_index("Date")[["NWP_Max_C", "NWP_Rain_mm", "NWP_Max_Wind_kmh"]], color=["#FF4B4B", "#0077B6", "#10B981"], use_container_width=True)
