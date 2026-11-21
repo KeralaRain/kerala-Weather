@@ -16,11 +16,6 @@ from engine import (
 st.set_page_config(page_title="Monsoon Prediction For Kerala :- Astro-Meteorological Forecasting System", page_icon="🌧️", layout="wide")
 st.markdown("<style>div[role='radiogroup'] { flex-wrap: wrap; gap: 6px; }</style>", unsafe_allow_html=True)
 
-import os as _os
-_db_ready_file = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "monsoon_jyotisha.db")
-if not (_os.path.exists(_db_ready_file) and _os.path.getsize(_db_ready_file) > 50000):
-    init_database()
-
 @st.cache_data
 def _cached_temp(yr, sec):
     return get_temperature_forecast(yr, sec)
