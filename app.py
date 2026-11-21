@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import pydeck as pdk
 from sqlalchemy import text
-from engine import engine, DB_BACKEND, NORMALS, to_scale, init_database, predict_and_cache_year, get_historical_backtest, get_njattuvela_forecast, get_extreme_year_profile, get_temperature_forecast, get_daily_astro_weather, get_vishu_ingress, get_month_daily_split, get_intraday_prahara_curve, get_month_all_praharas, get_astronomical_metrics, get_analog_years, fetch_live_kerala_nwp, fetch_7month_seasonal_forecast
+from engine import engine, DB_BACKEND, NORMALS, to_scale, init_database, predict_and_cache_year, get_historical_backtest, get_njattuvela_forecast, get_extreme_year_profile, get_temperature_forecast, get_daily_astro_weather, get_vishu_ingress, get_month_daily_split
 
 st.set_page_config(page_title="Monsoon Prediction For Kerala :- Astro-Meteorological Forecasting System", page_icon="🌧️", layout="wide")
 st.markdown("<style>div[data-baseweb='tab-list'] { flex-wrap: wrap; row-gap: 6px; }</style>", unsafe_allow_html=True)
@@ -49,7 +49,7 @@ with st.sidebar:
 
 predict_and_cache_year(int(sel_year))
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
     "1. General Kerala Annual",
     "2. 12-Month Kerala Forecast",
     "3. 9-Grid Kurma × 12 Months",
@@ -322,7 +322,7 @@ with tab8:
     st.subheader(f"Intraseasonal Day-by-Day Rain Surges vs. Hot Breaks ({sel_year})")
     st.caption("Tracks how a single month (e.g., August) alternates between 💧 Rain-Cooled Surges and ☀️ Dry Hot Breaks via Chandra Gochara")
     split_m = st.selectbox("Select Month to View Daily Rain vs. Heat Alternation:", list(range(1, 13)), index=7, format_func=lambda m: f"Month {m:02d}")
-    df_split = get_month_daily_split, get_intraday_prahara_curve, get_month_all_praharas, get_astronomical_metrics, get_analog_years, fetch_live_kerala_nwp, fetch_7month_seasonal_forecast(int(sel_year), int(split_m), int(sel_sec))
+    df_split = get_month_daily_split(int(sel_year), int(split_m), int(sel_sec))
     s1, s2, s3 = st.columns(3)
     s1.metric("Rain-Cooled Surge Days", int(df_split["Intramonth_Phase"].str.contains("Rain Surge").sum()), "Cooler / Wet Spells")
     s2.metric("Hot Dry Break Days", int(df_split["Intramonth_Phase"].str.contains("Hot").sum()), "Clear-Sky Heat Spells")
@@ -364,7 +364,7 @@ with tab8:
     st.download_button(f"Download {mp_year}-{mp_month:02d} 3-Hour Schedule CSV", df_mp.to_csv(index=False), f"kerala_3hr_schedule_{mp_year}_{mp_month:02d}.csv")
 
     st.divider()
-    v_hot, v_nak, v_mars = get_vishu_ingress, get_month_daily_split, get_intraday_prahara_curve, get_month_all_praharas, get_astronomical_metrics, get_analog_years, fetch_live_kerala_nwp, fetch_7month_seasonal_forecast(int(sel_year))
+    v_hot, v_nak, v_mars = get_vishu_ingress, get_month_daily_split(int(sel_year))
     st.info(f"**Mesha Sankranti (Vishu, Apr 14) Thermal Anchor ({sel_year}):** Moon in **{v_nak}** | Mars Agni Aspect: **{'Active (Amplifies Summer Heat)' if v_mars else 'Inactive'}** -> Summer Regime: **{'🔴 Elevated Heatwave Risk' if v_hot else '🟢 Moderate Summer'}**")
     if st.button("Scan 2026–2035 for Extreme Heatwave Years & Months"):
         h_rows = []
@@ -372,7 +372,7 @@ with tab8:
             for hy in range(2026, 2036):
                 df_ty = _cached_temp(hy, int(sel_sec))
                 pk_r = df_ty.loc[df_ty["Max_Temp_C"].idxmax()]
-                vh, vn, _ = get_vishu_ingress, get_month_daily_split, get_intraday_prahara_curve, get_month_all_praharas, get_astronomical_metrics, get_analog_years, fetch_live_kerala_nwp, fetch_7month_seasonal_forecast(hy)
+                vh, vn, _ = get_vishu_ingress, get_month_daily_split(hy)
                 h_rows.append({
                     "Year": hy,
                     "Vishu_Moon": vn,
