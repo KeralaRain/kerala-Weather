@@ -27,6 +27,25 @@ def get_engine():
 
 engine, DB_BACKEND = get_engine()
 
+def create_all_tables():
+    stmts = (
+        "CREATE TABLE IF NOT EXISTS imd_master_history (year INT, month INT, imd_normal_mm REAL, imd_actual_mm REAL, data_source TEXT, PRIMARY KEY (year, month))",
+        "CREATE TABLE IF NOT EXISTS kurma_sectors_dams (sector_id INT PRIMARY KEY, sector_name TEXT, nakshatras TEXT, river_basins TEXT, major_dams TEXT)",
+        "CREATE TABLE IF NOT EXISTS rainfall_predictions (year INT, sector_id INT, month INT, score_1_to_10 INT, predicted_mm REAL, predicted_l_per_m2 REAL, departure_pct REAL, astro_notes TEXT, PRIMARY KEY (year, sector_id, month))",
+        "CREATE TABLE IF NOT EXISTS njattuvela_forecasts (year INT, no INT, njattuvela TEXT, start_date TEXT, end_date TEXT, ingress_moon TEXT, scale_1_10 INT, normal_mm REAL, predicted_mm REAL, departure_pct REAL, status TEXT, PRIMARY KEY (year, no))",
+        "CREATE TABLE IF NOT EXISTS extreme_risk_profiles (year INT, month INT, imd_normal_mm REAL, drought_tail_14pct_mm REAL, expected_forecast_mm REAL, flood_tail_88pct_mm REAL, node_storm_score INT, cancer_stellium_days INT, astro_triggers TEXT, ardra_nak TEXT, ardra_ben INT, swati_nak TEXT, PRIMARY KEY (year, month))",
+        "CREATE TABLE IF NOT EXISTS temperature_forecasts (year INT, sector_id INT, month INT, max_temp_c REAL, min_temp_c REAL, departure_c REAL, fire_stellium_days INT, sun_mars_agni_days INT, thermal_outlook TEXT, PRIMARY KEY (year, sector_id, month))",
+        "CREATE TABLE IF NOT EXISTS wind_forecasts (year INT, sector_id INT, month INT, avg_wind_kmh REAL, peak_wind_kmh REAL, prevailing_direction TEXT, gusty_gale_days INT, calm_nowind_days INT, PRIMARY KEY (year, sector_id, month))",
+        "CREATE TABLE IF NOT EXISTS analog_year_matches (target_year INT, analog_year INT, celestial_similarity_pct REAL, imd_actual_annual_mm REAL, PRIMARY KEY (target_year, analog_year))",
+        "CREATE TABLE IF NOT EXISTS backtest_validation_history (year INT PRIMARY KEY, ardra_moon TEXT, swati_moon TEXT, imd_actual_mm REAL, v6_insample_mm REAL, insample_fit_pct REAL, v6_blind_oos_mm REAL, blind_oos_acc_pct REAL, sw_acc_pct REAL, thulavarsham_actual_mm REAL, thulavarsham_pred_mm REAL, thulavarsham_acc_pct REAL, summer_acc_pct REAL, winter_acc_pct REAL)"
+    )
+    with engine.begin() as _c:
+        for _s in stmts:
+            _c.execute(text(_s))
+
+create_all_tables()
+
+
 NORMALS = {1:11.2, 2:11.2, 3:36.0, 4:119.2, 5:206.3, 6:648.0, 7:653.0, 8:445.0, 9:303.2, 10:302.0, 11:152.0, 12:37.6}
 WATER_NAKS = {2, 4, 6, 7, 18, 20, 22, 25}
 WATER_SIGNS = {3, 7, 11}
