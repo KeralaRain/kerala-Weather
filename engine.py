@@ -20,7 +20,15 @@ def get_engine():
             pass
     repo_db = os.path.join(os.path.dirname(os.path.abspath(__file__)), "monsoon_jyotisha.db")
     if os.path.exists(repo_db):
-        return create_engine(f"sqlite:///{repo_db}"), "sqlite"
+        if os.access(repo_db, os.W_OK) and os.access(os.path.dirname(repo_db), os.W_OK):
+            return create_engine(f"sqlite:///{repo_db}"), "sqlite"
+        import shutil
+        data_dir = os.path.join(os.path.expanduser("~"), ".monsoon_jyotisha")
+        os.makedirs(data_dir, exist_ok=True)
+        local_copy = os.path.join(data_dir, "monsoon_jyotisha_local.db")
+        if not os.path.exists(local_copy):
+            shutil.copy2(repo_db, local_copy)
+        return create_engine(f"sqlite:///{local_copy}"), "sqlite"
     try:
         eng = create_engine("postgresql://jyotisha:monsoon2026@localhost:5432/monsoon_jyotisha", connect_args={"connect_timeout": 1})
         with eng.connect() as c:
@@ -236,15 +244,20 @@ def predict_month_mm(model_pack, feat, month):
         return max(0.0, 0.55 * base_p + 0.45 * lo_p)
     return max(0.0, base_p)
 
+_DB_READY = False
 def init_database():
-    ensure_all_domain_tables()
+    global _DB_READY
+    if _DB_READY:
+        return
     try:
         with engine.connect() as c:
             cnt = c.execute(text("SELECT COUNT(*) FROM rainfall_predictions WHERE sector_id = 0 AND year = 2027")).scalar()
             if cnt and int(cnt) == 12:
+                _DB_READY = True
                 return
     except Exception:
         pass
+    ensure_all_domain_tables()
 
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "schema.sql")) as f:
         sql_script = f.read()
