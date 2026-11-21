@@ -9,17 +9,8 @@ from sqlalchemy import create_engine, text
 swe.set_sid_mode(swe.SIDM_LAHIRI)
 
 def get_engine():
-    pg_url = os.getenv("DATABASE_URL", "")
-    if pg_url:
-        try:
-            eng = create_engine(pg_url, connect_args={"connect_timeout": 2})
-            with eng.connect() as c:
-                c.execute(text("SELECT 1"))
-            return eng, "postgresql"
-        except Exception:
-            pass
     repo_db = os.path.join(os.path.dirname(os.path.abspath(__file__)), "monsoon_jyotisha.db")
-    if os.path.exists(repo_db):
+    if os.path.exists(repo_db) and os.path.getsize(repo_db) > 50000:
         if os.access(repo_db, os.W_OK) and os.access(os.path.dirname(repo_db), os.W_OK):
             return create_engine(f"sqlite:///{repo_db}"), "sqlite"
         import shutil
@@ -29,16 +20,10 @@ def get_engine():
         if not os.path.exists(local_copy):
             shutil.copy2(repo_db, local_copy)
         return create_engine(f"sqlite:///{local_copy}"), "sqlite"
-    try:
-        eng = create_engine("postgresql://jyotisha:monsoon2026@localhost:5432/monsoon_jyotisha", connect_args={"connect_timeout": 1})
-        with eng.connect() as c:
-            c.execute(text("SELECT 1"))
-        return eng, "postgresql"
-    except Exception:
-        data_dir = os.path.join(os.path.expanduser("~"), ".monsoon_jyotisha")
-        os.makedirs(data_dir, exist_ok=True)
-        sqlite_path = os.path.join(data_dir, "monsoon_jyotisha_local.db")
-        return create_engine(f"sqlite:///{sqlite_path}"), "sqlite"
+    data_dir = os.path.join(os.path.expanduser("~"), ".monsoon_jyotisha")
+    os.makedirs(data_dir, exist_ok=True)
+    sqlite_path = os.path.join(data_dir, "monsoon_jyotisha_local.db")
+    return create_engine(f"sqlite:///{sqlite_path}"), "sqlite"
 
 engine, DB_BACKEND = get_engine()
 
