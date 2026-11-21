@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import pydeck as pdk
 from sqlalchemy import text
 from engine import engine, DB_BACKEND, NORMALS, to_scale, init_database, predict_and_cache_year
 
@@ -7,7 +8,7 @@ st.set_page_config(page_title="Monsoon prediction For Kerala :- Astro-Meteorolog
 init_database()
 
 st.title("🌧️ Monsoon prediction For Kerala :- Astro-Meteorological Forecasting System")
-st.caption("V4 Refined Sidereal Engine | PostgreSQL Cached | 50-Year IMD Master History (1975–2026) | Units: 1–10 Scale, mm & Liters/m² (1 mm = 1 L/m²)")
+st.caption("V5 Spatial & Seasonal Edition | PostgreSQL Cached | 50-Year IMD Master History (1975–2026) | Units: 1–10 Scale, mm & Liters/m² (1 mm = 1 L/m²)")
 
 with st.sidebar:
     st.header("Forecast Controls")
@@ -34,6 +35,19 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 
 with tab1:
     st.subheader(f"General Kerala Annual Outlook — {sel_year}")
+    df_s = pd.read_sql(text("SELECT month, score_1_to_10, predicted_mm FROM rainfall_predictions WHERE sector_id = 0 AND year = :y"), engine, params={"y": int(sel_year)})
+    def s_calc(ms):
+        sub = df_s[df_s["month"].isin(ms)]
+        p, n = float(sub["predicted_mm"].sum()), sum(NORMALS[m] for m in ms)
+        return p, round(((p - n) / n) * 100.0, 1), round(float(sub["score_1_to_10"].mean()), 1)
+    sw_p, sw_d, sw_s = s_calc((6, 7, 8, 9))
+    ne_p, ne_d, ne_s = s_calc((10, 11, 12))
+    pr_p, pr_d, pr_s = s_calc((3, 4, 5))
+    c_s1, c_s2, c_s3 = st.columns(3)
+    c_s1.metric("Edavappathi (SW: Jun-Sep)", f"{sw_p:,.1f} mm", f"{sw_d:+.1f}% (Scale {sw_s}/10)")
+    c_s2.metric("Thulavarsham (NE: Oct-Dec)", f"{ne_p:,.1f} mm", f"{ne_d:+.1f}% (Scale {ne_s}/10)")
+    c_s3.metric("Summer Showers (Mar-May)", f"{pr_p:,.1f} mm", f"{pr_d:+.1f}% (Scale {pr_s}/10)")
+    st.divider()
     df_ann = pd.read_sql(text("""
         SELECT year, ROUND(AVG(score_1_to_10), 2) AS avg_score_1_10,
                SUM(predicted_mm) AS annual_mm, SUM(predicted_l_per_m2) AS annual_l_m2,
@@ -97,6 +111,19 @@ with tab4:
     st.dataframe(df_dams, use_container_width=True)
     st.markdown("##### Annual Catchment Volume by Sector (mm / L per m²)")
     st.bar_chart(df_dams.set_index("sector_name")["annual_catchment_mm"], use_container_width=True)
+    st.markdown("##### Interactive Kerala Kurma Sectors & Major Dams Map")
+    coords = {1:(10.53,76.21), 2:(9.85,76.98), 3:(10.83,76.68), 4:(9.34,77.15), 5:(8.53,77.15), 6:(9.62,76.38), 7:(11.12,76.12), 8:(11.98,75.56), 9:(11.65,75.96)}
+    df_map = df_dams.copy()
+    df_map["lat"] = tuple(coords[i][0] for i in range(1, 10))
+    df_map["lon"] = tuple(coords[i][1] for i in range(1, 10))
+    df_map["color"] = tuple(list((0, 119, 182, 210)) if s >= 6.5 else (list((16, 185, 129, 200)) if s >= 5.0 else list((245, 158, 11, 210))) for s in df_map["annual_score"])
+    df_map["radius"] = (df_map["annual_catchment_mm"] / df_map["annual_catchment_mm"].max()) * 16000 + 8000
+    st.pydeck_chart(pdk.Deck(
+        map_style=None,
+        initial_view_state=pdk.ViewState(latitude=10.35, longitude=76.45, zoom=6.5),
+        layers=list((pdk.Layer("ScatterplotLayer", data=df_map, get_position="[lon, lat]", get_color="color", get_radius="radius", pickable=True),)),
+        tooltip={"html": "<b>{sector_name}</b><br/>Dams: {major_dams}<br/>Annual: <b>{annual_catchment_mm} mm</b><br/>Score: {annual_score}/10"}
+    ))
 
 with tab5:
     st.subheader("Stored 50-Year IMD Master History (1975–2026) — Zero Re-Download Needed")

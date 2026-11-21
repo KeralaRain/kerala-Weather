@@ -5,3 +5,5 @@ sqlalchemy
 psycopg2-binary
 streamlit
 openpyxl
+pydeck
+pydeck
