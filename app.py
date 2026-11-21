@@ -110,6 +110,20 @@ if active_tab == "🌧️ Rain: Annual Overview":
     c_s1.metric("Edavappathi (SW: Jun-Sep)", f"{sw_p:,.1f} mm", f"{sw_d:+.1f}% (Scale {sw_s}/10)")
     c_s2.metric("Thulavarsham (NE: Oct-Dec)", f"{ne_p:,.1f} mm", f"{ne_d:+.1f}% (Scale {ne_s}/10)")
     c_s3.metric("Summer Showers (Mar-May)", f"{pr_p:,.1f} mm", f"{pr_d:+.1f}% (Scale {pr_s}/10)")
+    df_ext_m1, a_nak_m1, a_ben_m1, s_nak_m1 = get_extreme_year_profile(int(sel_year))
+    burst_m1 = sorted(list(set(
+        df_ext_m1[df_ext_m1["Node_Storm_Score"] >= 10]["Month"].tolist() +
+        df_ext_m1[df_ext_m1["Cancer_Stellium_Days"] >= 6]["Month"].tolist()
+    )))
+    with st.expander(f"📊 Seasonal Hydrometeorological Summary for {sel_year}", expanded=True):
+        burst_txt = (
+            f"While the 4-month seasonal cumulative total remains close to the IMD climatological baseline due to drier onset/withdrawal phases, **short-duration heavy convective rainfall & high reservoir-inflow bursts are projected in Month(s) {', '.join(str(m) for m in burst_m1)}**."
+            if burst_m1 else
+            "Precipitation is distributed steadily across the 4-month Southwest Monsoon window without prolonged statewide deluge or severe drought anomalies."
+        )
+        st.markdown(f"- **Southwest Monsoon (Edavappathi, Jun–Sep — `{sw_d:+.1f}%` vs. IMD Normal):** {burst_txt}")
+        st.markdown(f"- **Northeast Monsoon (Thulavarsham, Oct–Dec — `{ne_d:+.1f}%` vs. IMD Normal):** Driven by Bay of Bengal easterly wave activity and post-monsoon convective troughs across southern and central Kerala.")
+        st.markdown(f"- **Pre-Monsoon Summer Showers (Mar–May — `{pr_d:+.1f}%` vs. IMD Normal):** Reflects afternoon sea-breeze convergence and thunderstorm frequency prior to monsoon onset.")
     if abs(ocean_mult - 1.0) > 0.001:
         adj_ann = ann_total_val * ocean_mult
         st.info(f"**Ocean-Adjusted Annual Outlook ({enso_state} + {iod_state}):** **{adj_ann:,.1f} mm** (vs. Pure Astro: {ann_total_val:,.1f} mm | Multiplier: `{ocean_mult:.2f}x`)")
