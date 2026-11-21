@@ -1,3 +1,4 @@
+import joblib
 import itertools
 import os, json, calendar
 import numpy as np
@@ -163,11 +164,18 @@ def get_swati_pravesha(year):
     return False, "Unknown", 0.0
 
 _V6_MODEL = None
+_MODEL_CACHE_PATH = os.path.join(os.path.expanduser("~"), ".monsoon_jyotisha", "v6_models_v10.joblib")
 
 def get_v6_model():
     global _V6_MODEL
     if _V6_MODEL is not None:
         return _V6_MODEL
+    if os.path.exists(_MODEL_CACHE_PATH):
+        try:
+            _V6_MODEL = joblib.load(_MODEL_CACHE_PATH)
+            return _V6_MODEL
+        except Exception:
+            pass
     with engine.connect() as conn:
         df_h = pd.read_sql(text("SELECT year, month, imd_normal_mm, imd_actual_mm FROM imd_master_history ORDER BY year, month"), conn)
     if len(df_h) < 100:
@@ -191,6 +199,11 @@ def get_v6_model():
     m_drought = GradientBoostingRegressor(loss="quantile", alpha=0.14, n_estimators=320, max_depth=5, learning_rate=0.04, random_state=42).fit(X_arr, y_arr)
     m_win = GradientBoostingRegressor(n_estimators=300, max_depth=5, learning_rate=0.04, subsample=0.9, random_state=42).fit(np.array(X_w), np.array(y_w))
     _V6_MODEL = (m_main, m_flood, m_drought, m_win)
+    try:
+        os.makedirs(os.path.dirname(_MODEL_CACHE_PATH), exist_ok=True)
+        joblib.dump(_V6_MODEL, _MODEL_CACHE_PATH, compress=3)
+    except Exception:
+        pass
     return _V6_MODEL
 
 def predict_month_mm(model_pack, feat, month):
@@ -253,9 +266,14 @@ def init_database():
                     sc = to_scale(n, a)
                     conn.execute(text("INSERT INTO imd_master_history (year, month, imd_normal_mm, imd_actual_mm, actual_l_per_m2, actual_scale_1_10) VALUES (:y, :m, :n, :a, :l, :s) ON CONFLICT DO NOTHING"), {"y": yr, "m": m, "n": n, "a": a, "l": a, "s": sc})
 
-    get_v6_model()
+    ensure_all_domain_tables()
     for y in range(2026, 2031):
         predict_and_cache_year(y)
+        get_njattuvela_forecast(y)
+        get_extreme_year_profile(y)
+        get_temperature_forecast(y, 0)
+        get_annual_wind_overview(y, 0)
+        get_analog_years(y, 5)
 
 def predict_and_cache_year(target_year):
     with engine.begin() as conn:
@@ -872,9 +890,9 @@ def get_analog_years(target_year, top_n=5):
     return pd.DataFrame(scored).sort_values("Celestial_Similarity_pct", ascending=False).head(top_n)
 
 def fetch_live_kerala_nwp(lat=8.5241, lon=76.9366):
-    # Free zero-key Open-Meteo 14-day NWP forecast (ECMWF/GFS blend) with offline fallback
+    # Free zero-key Open-Meteo 14-day NWP forecast with Wind Gusts (km/h) & Surface Pressure (hPa)
     try:
-        u = f"https://open-meteo.com{lat}&longitude={lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max&timezone=Asia%2FKolkata&forecast_days=14"
+        u = f"https://open-meteo.com{lat}&longitude={lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,surface_pressure_mean&timezone=Asia%2FKolkata&forecast_days=14"
         raw = urllib.request.urlopen(u, timeout=6).read().decode("utf-8")
         data = json.loads(raw).get("daily", {})
         df_nwp = pd.DataFrame({
@@ -882,11 +900,36 @@ def fetch_live_kerala_nwp(lat=8.5241, lon=76.9366):
             "NWP_Max_C": data.get("temperature_2m_max", []),
             "NWP_Min_C": data.get("temperature_2m_min", []),
             "NWP_Rain_mm": data.get("precipitation_sum", []),
-            "NWP_Max_Wind_kmh": data.get("wind_speed_10m_max", [])
+            "NWP_Wind_kmh": data.get("wind_speed_10m_max", []),
+            "NWP_Gusts_kmh": data.get("wind_gusts_10m_max", []),
+            "Pressure_hPa": data.get("surface_pressure_mean", [])
         })
         return df_nwp, True
     except Exception:
         return pd.DataFrame(), False
+
+def get_annual_wind_overview(year, sector_id=0):
+    rows = []
+    for m in range(1, 13):
+        _, days = calendar.monthrange(year, m)
+        speeds, gale_d, calm_d, w_dir = [], 0, 0, ""
+        for d in range(1, days + 1):
+            wk, wd, ws = get_daily_wind_forecast(year, m, d, sector_id)
+            speeds.append(wk)
+            w_dir = wd
+            if "Gale" in ws or "Brisk" in ws: gale_d += 1
+            if "Calm" in ws: calm_d += 1
+        avg_w = round(float(np.mean(speeds)), 1)
+        max_w = round(float(np.max(speeds)), 1)
+        rows.append({
+            "Month": m,
+            "Avg_Wind_kmh": avg_w,
+            "Peak_Wind_kmh": max_w,
+            "Prevailing_Direction": w_dir,
+            "Gusty_Gale_Days": gale_d,
+            "Calm_NoWind_Days": calm_d
+        })
+    return pd.DataFrame(rows)
 
 def fetch_7month_seasonal_forecast(lat=8.5241, lon=76.9366):
     # Free zero-key 210-day (7-Month) Global Seasonal Climate Ensemble (ECMWF SEAS5 / CFSv2)
@@ -912,3 +955,205 @@ def fetch_7month_seasonal_forecast(lat=8.5241, lon=76.9366):
         return df_m, True
     except Exception:
         return pd.DataFrame(), False
+
+def get_all_sectors_wind_summary(year):
+    rows = []
+    for sid, sname, _, _, _, _ in SECTORS:
+        df_w = get_annual_wind_overview(year, sid)
+        rows.append({
+            "Sector": sname,
+            "Annual_Avg_Wind_kmh": round(float(df_w["Avg_Wind_kmh"].mean()), 1),
+            "Peak_Gust_Month_kmh": round(float(df_w["Peak_Wind_kmh"].max()), 1),
+            "Total_Gale_Gust_Days": int(df_w["Gusty_Gale_Days"].sum()),
+            "Total_Calm_NoWind_Days": int(df_w["Calm_NoWind_Days"].sum())
+        })
+    return pd.DataFrame(rows)
+
+def get_intraday_wind_curve(target_date, sector_id=0):
+    flags = swe.FLG_SWIEPH | swe.FLG_SIDEREAL
+    y, m, d = target_date.year, target_date.month, target_date.day
+    base_kmh, season_dir, _ = get_daily_wind_forecast(y, m, d, sector_id)
+
+    # 8 Prahara (3-hour IST) slots with Kerala diurnal land-sea breeze multipliers & direction shifts
+    slots = (
+        ("00:00 IST (Nishitha)", 0.62, "ENE (Night Land Breeze)"),
+        ("03:00 IST (Brahma-Pre)", 0.50, "E / ENE (Calm Offshore)"),
+        ("06:00 IST (Pratah / Dawn)", 0.55, "ENE (Dawn Transition)"),
+        ("09:00 IST (Purvahna)", 0.88, "WNW (Morning Sea Breeze Onset)"),
+        ("12:00 IST (Madhyahna)", 1.25, "W / WNW (Brisk Sea Breeze)"),
+        ("15:00 IST (Aparahna)", 1.38, "WSW / W (Peak Afternoon Gusts)"),
+        ("18:00 IST (Sayahna)", 1.05, "WSW (Evening Coastal Breeze)"),
+        ("21:00 IST (Pradosha)", 0.74, "NE / ENE (Breeze Slackening)"),
+    )
+    # Direction lookup by Rising Lagna element
+    lagna_dirs = (
+        "E (Mesha)", "S (Vrishabha)", "W (Mithuna-Air)", "N (Karkataka)",
+        "E (Simha)", "S (Kanya)", "W (Tula-Air)", "N (Vrischika)",
+        "E (Dhanu)", "S (Makara)", "W (Kumbha-Air)", "N (Meena)"
+    )
+
+    rows = []
+    for idx, (label, d_mult, diurnal_dir) in enumerate(slots):
+        ist_hr = idx * 3.0
+        jd_slot = swe.julday(y, m, d, ist_hr - 5.5)
+        _, ascmc = swe.houses_ex(jd_slot, 10.0, 76.3, b'P', flags)
+        lagna_sign = int(next(iter(ascmc)) // 30)
+
+        l_mult = 1.22 if lagna_sign in AIR_SIGNS else (0.85 if lagna_sign in WATER_SIGNS else 1.0)
+        slot_kmh = round(float(np.clip(base_kmh * d_mult * l_mult, 2.5, 62.0)), 1)
+
+        # Blend seasonal monsoon flow with diurnal land-sea breeze & Lagna shift
+        if m in (6, 7, 8) and idx in (3, 4, 5, 6):
+            eff_dir = "WSW / West (Strong Monsoon Onshore)"
+        elif sector_id == 3 and m in (11, 12, 1, 2):
+            eff_dir = "E / ENE (Palakkad Gap Channel)"
+        else:
+            eff_dir = f"{diurnal_dir} | {next(itertools.islice(lagna_dirs, lagna_sign, None))}"
+
+        if slot_kmh >= 28.0:
+            w_stat = "💨 Strong Gusts / Squall"
+        elif slot_kmh >= 16.0:
+            w_stat = "🌬️ Brisk Breeze"
+        elif slot_kmh <= 8.0:
+            w_stat = "🍃 Calm / No-Wind"
+        else:
+            w_stat = "🌿 Light Breeze"
+
+        rows.append({
+            "Time_IST": label,
+            "Wind_Speed_kmh": slot_kmh,
+            "Wind_Direction": eff_dir,
+            "Condition": w_stat
+        })
+    return pd.DataFrame(rows)
+
+
+def ensure_all_domain_tables():
+    stmts = (
+        "CREATE TABLE IF NOT EXISTS njattuvela_forecasts (year INT, no INT, njattuvela TEXT, start_date TEXT, end_date TEXT, ingress_moon TEXT, scale_1_10 INT, normal_mm REAL, predicted_mm REAL, departure_pct REAL, status TEXT, PRIMARY KEY (year, no))",
+        "CREATE TABLE IF NOT EXISTS extreme_risk_profiles (year INT, month INT, imd_normal_mm REAL, drought_tail_14pct_mm REAL, expected_forecast_mm REAL, flood_tail_88pct_mm REAL, node_storm_score INT, cancer_stellium_days INT, astro_triggers TEXT, ardra_nak TEXT, ardra_ben INT, swati_nak TEXT, PRIMARY KEY (year, month))",
+        "CREATE TABLE IF NOT EXISTS temperature_forecasts (year INT, sector_id INT, month INT, max_temp_c REAL, min_temp_c REAL, departure_c REAL, fire_stellium_days INT, sun_mars_agni_days INT, thermal_outlook TEXT, PRIMARY KEY (year, sector_id, month))",
+        "CREATE TABLE IF NOT EXISTS wind_forecasts (year INT, sector_id INT, month INT, avg_wind_kmh REAL, peak_wind_kmh REAL, prevailing_direction TEXT, gusty_gale_days INT, calm_nowind_days INT, PRIMARY KEY (year, sector_id, month))",
+        "CREATE TABLE IF NOT EXISTS analog_year_matches (target_year INT, analog_year INT, celestial_similarity_pct REAL, imd_actual_annual_mm REAL, PRIMARY KEY (target_year, analog_year))",
+        "CREATE TABLE IF NOT EXISTS backtest_validation_history (year INT PRIMARY KEY, ardra_moon TEXT, swati_moon TEXT, imd_actual_mm REAL, v6_insample_mm REAL, insample_fit_pct REAL, v6_blind_oos_mm REAL, blind_oos_acc_pct REAL, sw_acc_pct REAL, thulavarsham_actual_mm REAL, thulavarsham_pred_mm REAL, thulavarsham_acc_pct REAL, summer_acc_pct REAL, winter_acc_pct REAL)"
+    )
+    with engine.begin() as conn:
+        for s in stmts:
+            conn.execute(text(s))
+
+_raw_njattuvela = get_njattuvela_forecast
+def get_njattuvela_forecast(year):
+    ensure_all_domain_tables()
+    with engine.connect() as conn:
+        df = pd.read_sql(text('SELECT no AS "No", njattuvela AS "Njattuvela", start_date AS "Start_Date", end_date AS "End_Date", ingress_moon AS "Ingress_Moon", scale_1_10 AS "Scale_1_10", normal_mm AS "Normal_mm", predicted_mm AS "Predicted_mm", departure_pct AS "Departure_pct", status AS "Status" FROM njattuvela_forecasts WHERE year = :y ORDER BY start_date'), conn, params={"y": int(year)})
+    if len(df) >= 26:
+        return df
+    df = _raw_njattuvela(int(year))
+    with engine.begin() as conn:
+        for _, r in df.iterrows():
+            conn.execute(text("INSERT INTO njattuvela_forecasts VALUES (:y, :no, :nj, :sd, :ed, :im, :sc, :nm, :pm, :dp, :st) ON CONFLICT DO NOTHING"), {
+                "y": int(year), "no": int(r["No"]), "nj": r["Njattuvela"], "sd": r["Start_Date"], "ed": r["End_Date"],
+                "im": r["Ingress_Moon"], "sc": int(r["Scale_1_10"]), "nm": float(r["Normal_mm"]), "pm": float(r["Predicted_mm"]),
+                "dp": float(r["Departure_pct"]), "st": r["Status"]
+            })
+    return df
+
+_raw_extreme = get_extreme_year_profile
+def get_extreme_year_profile(year):
+    ensure_all_domain_tables()
+    with engine.connect() as conn:
+        df = pd.read_sql(text('SELECT month AS "Month", imd_normal_mm AS "IMD_Normal_mm", drought_tail_14pct_mm AS "Drought_Tail_14pct_mm", expected_forecast_mm AS "Expected_Forecast_mm", flood_tail_88pct_mm AS "Flood_Tail_88pct_mm", node_storm_score AS "Node_Storm_Score", cancer_stellium_days AS "Cancer_Stellium_Days", astro_triggers AS "Astro_Triggers", ardra_nak, ardra_ben, swati_nak FROM extreme_risk_profiles WHERE year = :y ORDER BY month'), conn, params={"y": int(year)})
+    if len(df) == 12:
+        r0 = next(iter(df.to_dict("records")))
+        return df.drop(columns=["ardra_nak", "ardra_ben", "swati_nak"]), r0["ardra_nak"], bool(r0["ardra_ben"]), r0["swati_nak"]
+    df_e, an, ab, sn = _raw_extreme(int(year))
+    with engine.begin() as conn:
+        for _, r in df_e.iterrows():
+            conn.execute(text("INSERT INTO extreme_risk_profiles VALUES (:y, :m, :nm, :dr, :ex, :fl, :ns, :cs, :at, :an, :ab, :sn) ON CONFLICT DO NOTHING"), {
+                "y": int(year), "m": int(r["Month"]), "nm": float(r["IMD_Normal_mm"]), "dr": float(r["Drought_Tail_14pct_mm"]),
+                "ex": float(r["Expected_Forecast_mm"]), "fl": float(r["Flood_Tail_88pct_mm"]), "ns": int(r["Node_Storm_Score"]),
+                "cs": int(r["Cancer_Stellium_Days"]), "at": r["Astro_Triggers"], "an": an, "ab": int(bool(ab)), "sn": sn
+            })
+    return df_e, an, ab, sn
+
+_raw_temp = get_temperature_forecast
+def get_temperature_forecast(year, sector_id=0):
+    ensure_all_domain_tables()
+    with engine.connect() as conn:
+        df = pd.read_sql(text('SELECT month AS "Month", max_temp_c AS "Max_Temp_C", min_temp_c AS "Min_Temp_C", departure_c AS "Departure_C", fire_stellium_days AS "Fire_Stellium_Days", sun_mars_agni_days AS "Sun_Mars_Agni_Days", thermal_outlook AS "Thermal_Outlook" FROM temperature_forecasts WHERE year = :y AND sector_id = :s ORDER BY month'), conn, params={"y": int(year), "s": int(sector_id)})
+    if len(df) == 12:
+        return df
+    df = _raw_temp(int(year), int(sector_id))
+    with engine.begin() as conn:
+        for _, r in df.iterrows():
+            conn.execute(text("INSERT INTO temperature_forecasts VALUES (:y, :s, :m, :mx, :mn, :dp, :fs, :sm, :to) ON CONFLICT DO NOTHING"), {
+                "y": int(year), "s": int(sector_id), "m": int(r["Month"]), "mx": float(r["Max_Temp_C"]), "mn": float(r["Min_Temp_C"]),
+                "dp": float(r["Departure_C"]), "fs": int(r["Fire_Stellium_Days"]), "sm": int(r["Sun_Mars_Agni_Days"]), "to": r["Thermal_Outlook"]
+            })
+    return df
+
+_raw_wind12 = get_annual_wind_overview
+def get_annual_wind_overview(year, sector_id=0):
+    ensure_all_domain_tables()
+    with engine.connect() as conn:
+        df = pd.read_sql(text('SELECT month AS "Month", avg_wind_kmh AS "Avg_Wind_kmh", peak_wind_kmh AS "Peak_Wind_kmh", prevailing_direction AS "Prevailing_Direction", gusty_gale_days AS "Gusty_Gale_Days", calm_nowind_days AS "Calm_NoWind_Days" FROM wind_forecasts WHERE year = :y AND sector_id = :s ORDER BY month'), conn, params={"y": int(year), "s": int(sector_id)})
+    if len(df) == 12:
+        return df
+    df = _raw_wind12(int(year), int(sector_id))
+    with engine.begin() as conn:
+        for _, r in df.iterrows():
+            conn.execute(text("INSERT INTO wind_forecasts VALUES (:y, :s, :m, :aw, :pw, :pd, :gd, :cd) ON CONFLICT DO NOTHING"), {
+                "y": int(year), "s": int(sector_id), "m": int(r["Month"]), "aw": float(r["Avg_Wind_kmh"]), "pw": float(r["Peak_Wind_kmh"]),
+                "pd": r["Prevailing_Direction"], "gd": int(r["Gusty_Gale_Days"]), "cd": int(r["Calm_NoWind_Days"])
+            })
+    return df
+
+_raw_analog = get_analog_years
+def get_analog_years(target_year, top_n=5):
+    ensure_all_domain_tables()
+    with engine.connect() as conn:
+        df = pd.read_sql(text('SELECT analog_year AS "Analog_Year", celestial_similarity_pct AS "Celestial_Similarity_pct", imd_actual_annual_mm AS "IMD_Actual_Annual_mm" FROM analog_year_matches WHERE target_year = :ty ORDER BY celestial_similarity_pct DESC LIMIT :n'), conn, params={"ty": int(target_year), "n": int(top_n)})
+    if len(df) >= top_n:
+        return df
+    df = _raw_analog(int(target_year), int(top_n))
+    with engine.begin() as conn:
+        for _, r in df.iterrows():
+            conn.execute(text("INSERT INTO analog_year_matches VALUES (:ty, :ay, :cs, :im) ON CONFLICT DO NOTHING"), {
+                "ty": int(target_year), "ay": int(r["Analog_Year"]), "cs": float(r["Celestial_Similarity_pct"]), "im": float(r["IMD_Actual_Annual_mm"])
+            })
+    return df
+
+_raw_backtest = get_historical_backtest
+def get_historical_backtest(start_yr=1975, end_yr=2026):
+    ensure_all_domain_tables()
+    with engine.connect() as conn:
+        df = pd.read_sql(text('SELECT year AS "Year", ardra_moon AS "Ardra_Moon", swati_moon AS "Swati_Moon", imd_actual_mm AS "IMD_Actual_mm", v6_insample_mm AS "V6_InSample_mm", insample_fit_pct AS "InSample_Fit_pct", v6_blind_oos_mm AS "V6_Blind_OOS_mm", blind_oos_acc_pct AS "Blind_OOS_Acc_pct", sw_acc_pct AS "SW_Acc_pct", thulavarsham_actual_mm AS "Thulavarsham_Actual_mm", thulavarsham_pred_mm AS "Thulavarsham_Pred_mm", thulavarsham_acc_pct AS "Thulavarsham_Acc_pct", summer_acc_pct AS "Summer_Acc_pct", winter_acc_pct AS "Winter_Acc_pct" FROM backtest_validation_history WHERE year BETWEEN :y1 AND :y2 ORDER BY year'), conn, params={"y1": int(start_yr), "y2": int(end_yr)})
+    if len(df) >= (end_yr - start_yr + 1):
+        return df
+    df = _raw_backtest(int(start_yr), int(end_yr))
+    with engine.begin() as conn:
+        for _, r in df.iterrows():
+            conn.execute(text("INSERT INTO backtest_validation_history VALUES (:y, :am, :sm, :ia, :vi, :ifp, :vb, :boa, :swa, :ta, :tp, :tap, :sua, :wia) ON CONFLICT DO NOTHING"), {
+                "y": int(r["Year"]), "am": r["Ardra_Moon"], "sm": r["Swati_Moon"], "ia": float(r["IMD_Actual_mm"]),
+                "vi": float(r["V6_InSample_mm"]), "ifp": float(r["InSample_Fit_pct"]), "vb": float(r["V6_Blind_OOS_mm"]),
+                "boa": float(r["Blind_OOS_Acc_pct"]), "swa": float(r["SW_Acc_pct"]), "ta": float(r["Thulavarsham_Actual_mm"]),
+                "tp": float(r["Thulavarsham_Pred_mm"]), "tap": float(r["Thulavarsham_Acc_pct"]), "sua": float(r["Summer_Acc_pct"]),
+                "wia": float(r["Winter_Acc_pct"])
+            })
+    return df
+
+def prepopulate_all_tables(start_yr=1975, end_yr=2035):
+    ensure_all_domain_tables()
+    # 1. Pre-populate 1975-2026 52-Year Validation History
+    get_historical_backtest(1975, 2026)
+    # 2. Pre-populate key historic case-study years + 2026-2035 across all tables & sectors
+    target_years = sorted(list(set(list(range(2015, 2036)) + [1992, 2007])))
+    for y in target_years:
+        predict_and_cache_year(y)
+        get_njattuvela_forecast(y)
+        get_extreme_year_profile(y)
+        get_analog_years(y, 5)
+        for sid in range(0, 10):
+            get_temperature_forecast(y, sid)
+            get_annual_wind_overview(y, sid)
+    return len(target_years)
