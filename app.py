@@ -18,6 +18,10 @@ st.markdown("<style>div[role='radiogroup'] { flex-wrap: wrap; gap: 6px; }</style
 
 @st.cache_resource
 def _boot():
+    import os
+    db_f = os.path.join(os.path.dirname(os.path.abspath(__file__)), "monsoon_jyotisha.db")
+    if os.path.exists(db_f) and os.path.getsize(db_f) > 50000:
+        return True
     init_database()
     return True
 
