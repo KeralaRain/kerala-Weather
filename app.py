@@ -32,6 +32,25 @@ def _cached_nwp(lat, lon):
 def _cached_seas(lat, lon):
     return fetch_7month_seasonal_forecast(lat, lon)
 
+
+_SEC_REPLACE = {
+    "1. Center (Madhya)": "1. Central Kerala (Thrissur / Chalakudy)",
+    "2. East (Purva)": "2. East High Ranges (Idukki / Munnar)",
+    "3. Southeast (Agneya)": "3. Southeast Gap (Palakkad / Attappady)",
+    "4. South (Dakshina)": "4. South Kerala (Pathanamthitta / Kollam)",
+    "5. Southwest (Nairutya)": "5. Southwest Coast (Thiruvananthapuram)",
+    "6. West (Paschima)": "6. West Coast (Kottayam / Alappuzha / Ernakulam)",
+    "7. Northwest (Vayavya)": "7. Northwest Kerala (Malappuram / Kozhikode)",
+    "8. North (Uttara)": "8. North Kerala (Kannur / Kasaragod)",
+    "9. Northeast (Ishanya)": "9. Northeast High Ranges (Wayanad)"
+}
+def _clean_sec(df):
+    if "sector_name" in df.columns:
+        df["sector_name"] = df["sector_name"].replace(_SEC_REPLACE)
+    if "Sector" in df.columns:
+        df["Sector"] = df["Sector"].replace(_SEC_REPLACE)
+    return df
+
 def classify_regime(ann_mm, peak_month_mm=0.0):
     if ann_mm >= 3650.0 or peak_month_mm >= 900.0:
         return "🔴 SEVERE FLOOD / MEGA-DELUGE RISK"
@@ -73,7 +92,7 @@ predict_and_cache_year(int(sel_year))
 NAV_ITEMS = (
     "🌧️ Rain: Annual Overview",
     "🌧️ Rain: 12-Month Forecast",
-    "🌧️ Rain: 9-Sector Kurma Grid",
+    "🌧️ Rain: 9 Kerala Weather Sectors",
     "🌊 Rain: Dam Catchments & Map",
     "📅 Rain: 27 Njattuvela Almanac",
     "⚠️ Risk: Extreme Flood & Drought",
@@ -147,22 +166,24 @@ elif active_tab == "🌧️ Rain: 12-Month Forecast":
         st.line_chart(df_m.set_index("month")["score_1_to_10"], use_container_width=True)
     st.download_button(f"Download {sel_year} 12-Month CSV", df_m.to_csv(index=False), f"kerala_12m_{sel_year}.csv")
 
-elif active_tab == "🌧️ Rain: 9-Sector Kurma Grid":
-    st.subheader(f"9-Grid Kurma Chakra × 12 Months — {sel_year}")
+elif active_tab == "🌧️ Rain: 9 Kerala Weather Sectors":
+    st.subheader(f"9 Kerala Weather Sectors × 12 Months — {sel_year}")
     unit_choice = st.radio("Display Metric:", ("1–10 Intensity Scale", "Millimeters (mm)", "Liters per m² (L/m²)"), horizontal=True)
     col_map = {"1–10 Intensity Scale": "score_1_to_10", "Millimeters (mm)": "predicted_mm", "Liters per m² (L/m²)": "predicted_l_per_m2"}
     df_9 = pd.read_sql(text("SELECT k.sector_name, p.month, p.score_1_to_10, p.predicted_mm, p.predicted_l_per_m2 FROM rainfall_predictions p JOIN kurma_sectors_dams k ON p.sector_id = k.sector_id WHERE p.year = :y ORDER BY k.sector_id, p.month"), engine, params={"y": int(sel_year)})
+    df_9 = _clean_sec(df_9)
     piv = df_9.pivot(index="sector_name", columns="month", values=col_map.get(unit_choice))
     st.dataframe(piv, use_container_width=True)
 
 elif active_tab == "🌊 Rain: Dam Catchments & Map":
     st.subheader(f"Kerala Dam Catchments & River Basins — {sel_year}")
-    df_dams = pd.read_sql(text("SELECT k.sector_name, k.nakshatras, k.river_basins, k.major_dams, ROUND(AVG(p.score_1_to_10), 2) AS annual_score, SUM(p.predicted_mm) AS annual_catchment_mm, SUM(p.predicted_l_per_m2) AS annual_l_per_m2 FROM kurma_sectors_dams k JOIN rainfall_predictions p ON k.sector_id = p.sector_id WHERE p.year = :y GROUP BY k.sector_id, k.sector_name, k.nakshatras, k.river_basins, k.major_dams ORDER BY k.sector_id"), engine, params={"y": int(sel_year)})
+    df_dams = pd.read_sql(text("SELECT k.sector_name, k.river_basins, k.major_dams, ROUND(AVG(p.score_1_to_10), 2) AS annual_score, SUM(p.predicted_mm) AS annual_catchment_mm, SUM(p.predicted_l_per_m2) AS annual_l_per_m2 FROM kurma_sectors_dams k JOIN rainfall_predictions p ON k.sector_id = p.sector_id WHERE p.year = :y GROUP BY k.sector_id, k.sector_name, k.river_basins, k.major_dams ORDER BY k.sector_id"), engine, params={"y": int(sel_year)})
+    df_dams = _clean_sec(df_dams)
     st.dataframe(df_dams, use_container_width=True)
     st.markdown("##### Annual Catchment Volume by Sector (mm / L per m²)")
     st.bar_chart(df_dams.set_index("sector_name")["annual_catchment_mm"], use_container_width=True)
     import pydeck as pdk
-    st.markdown("##### Interactive Kerala Kurma Sectors & Major Dams Map")
+    st.markdown("##### Interactive Kerala Weather Sectors & Major Dams Map")
     coords = {1:(10.53,76.21), 2:(9.85,76.98), 3:(10.83,76.68), 4:(9.34,77.15), 5:(8.53,77.15), 6:(9.62,76.38), 7:(11.12,76.12), 8:(11.98,75.56), 9:(11.65,75.96)}
     df_map = df_dams.copy()
     df_map["lat"] = tuple(coords.get(i).__getitem__(0) for i in range(1, 10))
@@ -303,7 +324,7 @@ elif active_tab == "🌡️ Temp: Heatwave & 3-Hr Curve":
         8: "8. North (Kannur / Kasaragod)",
         9: "9. Northeast High Ranges (Wayanad)"
     }
-    sel_sec = st.selectbox("Select Kerala Region / Kurma Sector:", list(sec_options.keys()), format_func=lambda k: sec_options.get(k))
+    sel_sec = st.selectbox("Select Kerala Weather Sector:", list(sec_options.keys()), format_func=lambda k: sec_options.get(k))
     df_temp = _cached_temp(int(sel_year), int(sel_sec))
     t1, t2, t3 = st.columns(3)
     hottest = df_temp.loc[df_temp["Max_Temp_C"].idxmax()]
@@ -420,7 +441,7 @@ elif active_tab == "🛰️ Live NWP: 14-Day & 7-Month":
 
 elif active_tab == "💨 Wind: Speed, Gales & Calm":
     st.subheader(f"Kerala Wind Speed (km/h), Direction Rotation & Calm/Gale Forecast — {sel_year}")
-    st.caption("Brihat Samhita Vata-Chakra (Air Signs & Vayavya Nakshatras) + Diurnal Land-Sea Breeze + Kerala Kurma Funneling")
+    st.caption("Brihat Samhita Vata-Chakra (Air Signs & Vayavya Nakshatras) + Diurnal Land-Sea Breeze + Kerala Topographical Funneling")
     w_sec_options = {
         0: "Statewide Kerala Average",
         1: "1. Center (Thrissur / Chalakudy)",
@@ -433,7 +454,7 @@ elif active_tab == "💨 Wind: Speed, Gales & Calm":
         8: "8. North (Kannur / Kasaragod)",
         9: "9. Northeast High Ranges (Wayanad)"
     }
-    sel_w_sec = st.selectbox("Select Kerala Region / Kurma Sector for Wind Analysis:", list(w_sec_options.keys()), format_func=lambda k: w_sec_options.get(k))
+    sel_w_sec = st.selectbox("Select Kerala Weather Sector for Wind Analysis:", list(w_sec_options.keys()), format_func=lambda k: w_sec_options.get(k))
     df_wind12 = get_annual_wind_overview(int(sel_year), int(sel_w_sec))
     w1, w2, w3, w4 = st.columns(4)
     windiest = df_wind12.loc[df_wind12["Peak_Wind_kmh"].idxmax()]
@@ -467,8 +488,9 @@ elif active_tab == "💨 Wind: Speed, Gales & Calm":
     st.bar_chart(df_w_days.set_index("Day")["Wind_kmh"], color="#10B981", use_container_width=True)
     st.dataframe(df_w_days[["Date", "Moon_Nakshatra", "Wind_kmh", "Wind_Status", "Intramonth_Phase"]], use_container_width=True, hide_index=True)
     st.divider()
-    st.subheader(f"All 9 Kerala Kurma Sectors — Annual Wind Comparison ({sel_year})")
+    st.subheader(f"All 9 Kerala Weather Sectors — Annual Wind Comparison ({sel_year})")
     df_all_w = get_all_sectors_wind_summary(int(sel_year))
+    df_all_w = _clean_sec(df_all_w)
     st.dataframe(df_all_w, use_container_width=True, hide_index=True)
 
 with st.sidebar:
@@ -479,7 +501,7 @@ with st.sidebar:
         df_m_x = pd.read_sql(text("SELECT month, score_1_to_10, predicted_mm, predicted_l_per_m2, departure_pct, astro_notes FROM rainfall_predictions WHERE sector_id = 0 AND year = :y ORDER BY month"), engine, params={"y": int(sel_year)})
         df_9_x = pd.read_sql(text("SELECT k.sector_name, p.month, p.predicted_mm FROM rainfall_predictions p JOIN kurma_sectors_dams k ON p.sector_id = k.sector_id WHERE p.year = :y ORDER BY k.sector_id, p.month"), engine, params={"y": int(sel_year)})
         piv_x = df_9_x.pivot(index="sector_name", columns="month", values="predicted_mm")
-        df_dams_x = pd.read_sql(text("SELECT k.sector_name, k.nakshatras, k.river_basins, k.major_dams, ROUND(AVG(p.score_1_to_10), 2) AS annual_score, SUM(p.predicted_mm) AS annual_catchment_mm FROM kurma_sectors_dams k JOIN rainfall_predictions p ON k.sector_id = p.sector_id WHERE p.year = :y GROUP BY k.sector_id, k.sector_name, k.nakshatras, k.river_basins, k.major_dams ORDER BY k.sector_id"), engine, params={"y": int(sel_year)})
+        df_dams_x = pd.read_sql(text("SELECT k.sector_name, k.river_basins, k.major_dams, ROUND(AVG(p.score_1_to_10), 2) AS annual_score, SUM(p.predicted_mm) AS annual_catchment_mm FROM kurma_sectors_dams k JOIN rainfall_predictions p ON k.sector_id = p.sector_id WHERE p.year = :y GROUP BY k.sector_id, k.sector_name, k.river_basins, k.major_dams ORDER BY k.sector_id"), engine, params={"y": int(sel_year)})
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine="openpyxl") as writer:
             df_ann_x.to_excel(writer, sheet_name="5Yr_Annual_Outlook", index=False)

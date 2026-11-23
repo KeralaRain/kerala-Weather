@@ -56,15 +56,15 @@ NAK_NAMES = (
 )
 
 SECTORS = (
-    (1, "1. Center (Madhya)", "Krittika, Rohini, Mrigashira", "Bharathapuzha, Chalakudy, Karuvannur", "Peechi, Vazhani, Chimmony, Poringalkuthu", (15,15,35,115,210,680,710,460,295,290,140,35)),
-    (2, "2. East (Purva)", "Ardra, Punarvasu, Pushya", "Periyar, Muthirapuzha, Idamalayar", "Idukki, Mullaperiyar, Idamalayar, Mattupetty", (18,20,48,145,245,790,890,620,380,340,175,45)),
-    (3, "3. Southeast (Agneya)", "Ashlesha, Magha, P. Phalguni", "Upper Bharathapuzha, Bhavani, Pambar", "Malampuzha, Mangalam, Pothundi, Walayar", (8,8,24,85,145,410,450,290,195,245,130,28)),
-    (4, "4. South (Dakshina)", "U. Phalguni, Hasta, Chitra", "Pamba, Achankovil, Manimala, Kallada", "Kakki, Anathode, Pamba, Thenmala", (16,18,52,155,255,610,590,410,310,385,210,52)),
-    (5, "5. Southwest (Nairutya)", "Swati, Vishakha, Anuradha", "Vamanapuram, Karamana, Neyyar", "Neyyar, Peppara, Aruvikkara", (14,15,42,125,215,420,330,240,210,340,195,48)),
-    (6, "6. West (Paschima)", "Jyeshtha, Mula, P. Ashadha", "Meenachil, Lower Muvattupuzha, Vembanad", "Thanneermukkom Bund, Thottappally Spillway", (15,16,44,135,235,660,640,430,295,335,175,42)),
-    (7, "7. Northwest (Vayavya)", "U. Ashadha, Shravana, Dhanishtha", "Lower Chaliyar, Kadalundi, Tirur", "Kanjirapuzha Barrage", (6,6,22,95,195,740,760,480,290,265,120,25)),
-    (8, "8. North (Uttara)", "Shatabhisha, P. Bhadrapada, U. Bhadrapada", "Valapattanam, Chandragiri, Kuppam", "Pazhassi Barrage", (5,5,18,88,185,820,860,540,310,240,105,20)),
-    (9, "9. Northeast (Ishanya)", "Revati, Ashwini, Bharani", "Kabini, Upper Chaliyar, Kuttiyadi", "Banasura Sagar, Karapuzha, Kuttiyadi", (12,14,42,130,215,760,880,580,320,285,135,32)),
+    (1, "1. Central Kerala (Thrissur / Chalakudy)", "Krittika, Rohini, Mrigashira", "Bharathapuzha, Chalakudy, Karuvannur", "Peechi, Vazhani, Chimmony, Poringalkuthu", (15,15,35,115,210,680,710,460,295,290,140,35)),
+    (2, "2. East High Ranges (Idukki / Munnar)", "Ardra, Punarvasu, Pushya", "Periyar, Muthirapuzha, Idamalayar", "Idukki, Mullaperiyar, Idamalayar, Mattupetty", (18,20,48,145,245,790,890,620,380,340,175,45)),
+    (3, "3. Southeast Gap (Palakkad)", "Ashlesha, Magha, P. Phalguni", "Upper Bharathapuzha, Bhavani, Pambar", "Malampuzha, Mangalam, Pothundi, Walayar", (8,8,24,85,145,410,450,290,195,245,130,28)),
+    (4, "4. South Kerala (Pathanamthitta / Kollam)", "U. Phalguni, Hasta, Chitra", "Pamba, Achankovil, Manimala, Kallada", "Kakki, Anathode, Pamba, Thenmala", (16,18,52,155,255,610,590,410,310,385,210,52)),
+    (5, "5. Southwest Coast (Thiruvananthapuram)", "Swati, Vishakha, Anuradha", "Vamanapuram, Karamana, Neyyar", "Neyyar, Peppara, Aruvikkara", (14,15,42,125,215,420,330,240,210,340,195,48)),
+    (6, "6. West Coast (Kottayam / Alappuzha)", "Jyeshtha, Mula, P. Ashadha", "Meenachil, Lower Muvattupuzha, Vembanad", "Thanneermukkom Bund, Thottappally Spillway", (15,16,44,135,235,660,640,430,295,335,175,42)),
+    (7, "7. Northwest Kerala (Malappuram / Kozhikode)", "U. Ashadha, Shravana, Dhanishtha", "Lower Chaliyar, Kadalundi, Tirur", "Kanjirapuzha Barrage", (6,6,22,95,195,740,760,480,290,265,120,25)),
+    (8, "8. North Kerala (Kannur / Kasaragod)", "Shatabhisha, P. Bhadrapada, U. Bhadrapada", "Valapattanam, Chandragiri, Kuppam", "Pazhassi Barrage", (5,5,18,88,185,820,860,540,310,240,105,20)),
+    (9, "9. Northeast High Ranges (Wayanad)", "Revati, Ashwini, Bharani", "Kabini, Upper Chaliyar, Kuttiyadi", "Banasura Sagar, Karapuzha, Kuttiyadi", (12,14,42,130,215,760,880,580,320,285,135,32)),
 )
 
 def to_scale(n, a):
