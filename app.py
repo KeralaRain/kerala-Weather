@@ -13,7 +13,7 @@ from engine import (
     get_intraday_wind_curve, get_all_sectors_wind_summary, prepopulate_all_tables
 )
 
-st.set_page_config(page_title="Monsoon Prediction For Kerala :- Astro-Meteorological Forecasting System", page_icon="🌧️", layout="wide")
+st.set_page_config(page_title="Monsoon Prediction For Kerala :- Astronomical-Meteorological Forecasting System", page_icon="🌧️", layout="wide")
 st.markdown("<style>div[role='radiogroup'] { flex-wrap: wrap; gap: 6px; }</style>", unsafe_allow_html=True)
 
 @st.cache_data
@@ -43,7 +43,7 @@ def classify_regime(ann_mm, peak_month_mm=0.0):
         return "🟡 MODERATE RAINFALL DEFICIT"
     return "🟢 NORMAL MONSOON REGIME"
 
-st.title("🌧️ Monsoon Prediction For Kerala :- Astro-Meteorological Forecasting System")
+st.title("🌧️ Monsoon Prediction For Kerala :- Astronomical-Meteorological Forecasting System")
 st.caption("V10.3 Hybrid Astro-Astronomical-Meteorological Edition | 28-Feature Sidereal + ML Ensemble | 126-Yr IMD History (1901–2026) | 1 mm = 1 L/m²")
 
 with st.sidebar:
