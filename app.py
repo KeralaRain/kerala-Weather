@@ -99,7 +99,9 @@ NAV_ITEMS = (
     "🌡️ Temp: Heatwave & 3-Hr Curve",
     "💨 Wind: Speed, Gales & Calm",
     "🛰️ Live NWP: 14-Day & 7-Month",
-    "📚 Archive: 126-Yr IMD & Accuracy"
+    "📚 Archive: 126-Yr IMD & Accuracy",
+    "⚡ KSEB: Grid & Dam Inflow",
+    "📈 Weather vs. KSEB Demand"
 )
 active_tab = st.radio("Select Forecast Module:", NAV_ITEMS, horizontal=True, label_visibility="collapsed")
 
@@ -257,7 +259,7 @@ elif active_tab == "📅 Rain: 27 Njattuvela Almanac":
 
 elif active_tab == "⚠️ Risk: Extreme Flood & Drought":
     st.subheader(f"Extreme Flood & Severe Drought Tail-Risk Analysis — {sel_year}")
-    st.caption("Quantile Tail-Routed Ensemble (14th-Percentile Drought Floor vs. 88th-Percentile Deluge Ceiling) + Synodic Outer-Planet Cycles")
+    st.caption("Quantile Tail-Routed Ensemble (14th-Percentile Dry Floor vs. 88th-Percentile Deluge Ceiling) + Outer-Planet Synodic Cycles")
     df_ext, a_nak, a_ben, s_nak = get_extreme_year_profile(int(sel_year))
     tot_dr = float(df_ext["Drought_Tail_14pct_mm"].sum())
     tot_ex = float(df_ext["Expected_Forecast_mm"].sum())
@@ -267,46 +269,56 @@ elif active_tab == "⚠️ Risk: Extreme Flood & Drought":
     storm_ms = df_ext[df_ext["Node_Storm_Score"] >= 10]["Month"].tolist()
     canc_ms = df_ext[df_ext["Cancer_Stellium_Days"] >= 6]["Month"].tolist()
     burst_ms = sorted(list(set(storm_ms + canc_ms)))
+    month_names = {1:"Jan",2:"Feb",3:"Mar",4:"Apr",5:"May",6:"Jun",7:"Jul",8:"Aug",9:"Sep",10:"Oct",11:"Nov",12:"Dec"}
+    burst_str = ", ".join(f"{month_names.get(m)} (Month {m})" for m in burst_ms)
+
     if tot_ex >= 3650.0 or float(df_ext["Expected_Forecast_mm"].max()) >= 900.0:
-        st.error(f"**🔴 HIGH / EXTREME FLOOD ALERT FOR {sel_year}** — Astrological signs indicate **severe statewide flood risk** in {sel_year} (**{tot_ex:,.0f} mm**, **{dep_pct:+.1f}%** above normal). Major deluge triggers active in **Month(s) {', '.join(str(m) for m in burst_ms) if burst_ms else '6–9'}**.")
+        st.error(f"**🔴 HIGH / EXTREME FLOOD ALERT FOR {sel_year}** — Astronomical and hydrometeorological indicators point to **severe statewide flood risk** in {sel_year}. The most likely annual rainfall is **{tot_ex:,.0f} mm** (**{dep_pct:+.1f}%** above Kerala's 2,925 mm normal), with intense rain surges concentrated in **{burst_str if burst_ms else 'Jun–Sep'}**.")
     elif tot_ex <= 2280.0:
-        st.warning(f"**🟤 SEVERE DROUGHT ALERT FOR {sel_year}** — Astrological signs indicate **severe monsoon failure / drought risk** in {sel_year} (**{tot_ex:,.0f} mm**, **{dep_pct:+.1f}%** below normal).")
+        st.warning(f"**🟤 SEVERE DROUGHT ALERT FOR {sel_year}** — Orbital and climate indicators point to **severe monsoon deficit / drought risk** in {sel_year}, with expected annual rainfall of **{tot_ex:,.0f} mm** (**{dep_pct:+.1f}%** below normal).")
     elif burst_ms:
-        st.info(f"**🟠 NORMAL ANNUAL TOTAL WITH LOCALIZED HEAVY RAIN BURSTS IN {sel_year}** — Overall, **{sel_year} is NOT a statewide mega-flood year** (Expected total: **{tot_ex:,.0f} mm**, **{dep_pct:+.1f}%** vs. IMD normal). **However**, astrological storm & Cancer stellium triggers warn of **short-duration heavy rain / high dam-inflow bursts in Month(s) {', '.join(str(m) for m in burst_ms)}** (Flood ceiling up to **{tot_fl:,.0f} mm**).")
+        st.info(f"**🟠 NORMAL ANNUAL TOTAL WITH LOCALIZED HEAVY RAIN BURSTS IN {sel_year}** — Overall, **{sel_year} is NOT projected to be a statewide mega-flood year**: the central expected rainfall is **{tot_ex:,.0f} mm** (**{dep_pct:+.1f}%** compared to Kerala's 2,925 mm normal). **However**, orbital alignment and lunar nodal tidal indicators flag **short-duration heavy downpours and high dam-inflow bursts during {burst_str}** (with an upper storm-surge ceiling of **{tot_fl:,.0f} mm**).")
     else:
-        st.success(f"**🟢 STEADY / NORMAL MONSOON OUTLOOK FOR {sel_year}** — Astrological indicators point to a **balanced, normal monsoon year** in {sel_year} (**{tot_ex:,.0f} mm**, **{dep_pct:+.1f}%** vs. normal) with **no major statewide flood or drought triggers**.")
+        st.success(f"**🟢 STEADY / NORMAL MONSOON OUTLOOK FOR {sel_year}** — Celestial and climatological indicators point to a **balanced, normal monsoon year** in {sel_year} with expected rainfall of **{tot_ex:,.0f} mm** (**{dep_pct:+.1f}%** vs. normal) and **no major statewide flood or drought anomalies**.")
+
     e1, e2, e3, e4 = st.columns(4)
-    e1.metric("Drought Tail Scenario (14%)", f"{tot_dr:,.0f} mm", f"{((tot_dr-2924.7)/2924.7)*100:+.1f}% vs Normal")
-    e2.metric("Expected Forecast (Central)", f"{tot_ex:,.0f} mm", f"{dep_pct:+.1f}% vs Normal")
-    e3.metric("Flood Tail Ceiling (88%)", f"{tot_fl:,.0f} mm", f"Peak Month: {peak_fl:,.0f} mm")
-    e4.metric("Ingress Anchors", f"Ardra: {a_nak}", f"Swati: {s_nak}")
-    with st.expander(f"📜 Detailed Jyotisha & Sidereal Ephemeris Analysis for {sel_year}", expanded=True):
+    e1.metric("Dry-Scenario Floor (Low Bound)", f"{tot_dr:,.0f} mm", f"{((tot_dr-2924.7)/2924.7)*100:+.1f}% if monsoon underperforms")
+    e2.metric("Expected Annual Rain (Most Likely)", f"{tot_ex:,.0f} mm", f"{dep_pct:+.1f}% vs. 2,925 mm IMD Normal")
+    e3.metric("Storm-Surge Ceiling (Upper Bound)", f"{tot_fl:,.0f} mm", f"Max Monthly Surge: {peak_fl:,.0f} mm")
+    e4.metric("Solar Longitude Phase", f"Jun Solstice: {a_nak}", f"Oct Equinox Phase: {s_nak}")
+
+    st.caption("💡 **How to read these three rainfall numbers:** **Expected Annual Rain** is the primary forecast for the year. The **Dry-Scenario Floor** shows the minimum rainfall expected if monsoon breaks last longer than usual, while the **Storm-Surge Ceiling** shows the maximum total if intense low-pressure systems develop.")
+
+    with st.expander(f"🔭 Astronomical & Orbital Ephemeris Summary for {sel_year}", expanded=True):
         peak_row = df_ext.loc[df_ext["Expected_Forecast_mm"].idxmax()]
+        pk_m_int = int(peak_row["Month"])
         a_col1, a_col2 = st.columns(2)
         with a_col1:
-            st.markdown(f"**1. Solar Ingress Anchors ({sel_year})**")
-            st.markdown(f"- **Ardra Pravesha (SW Monsoon Onset, Jun 21–22):** Moon in **{a_nak}** {'with **Jupiter/Venus benefic aspect** (amplifies Arabian Sea moisture)' if a_ben else '(no direct Jupiter/Venus ingress aspect)'}.")
-            st.markdown(f"- **Swati Pravesha (Thulavarsham NE, Oct 24):** Moon in **{s_nak}** (governs Bay of Bengal cyclonic & convective activity).")
-            st.markdown(f"- **Peak Deluge Window:** Month **{int(peak_row['Month'])}** (`{peak_row['Expected_Forecast_mm']} mm` expected / `{peak_row['Flood_Tail_88pct_mm']} mm` flood ceiling) — `{peak_row['Astro_Triggers']}`.")
+            st.markdown(f"**1. Key Solar & Lunar Orbital Benchmarks ({sel_year})**")
+            st.markdown(f"- **Summer Solstice Solar Longitude (Jun 21–22):** Lunar orbital position in **{a_nak}** {'with **Jupiter/Venus angular alignment** (enhances Arabian Sea moisture transport)' if a_ben else '(neutral planetary angular alignment)'}.")
+            st.markdown(f"- **Post-Monsoon Solar Longitude (Oct 24):** Lunar orbital position in **{s_nak}** (governs Bay of Bengal easterly wave and convective activity).")
+            st.markdown(f"- **Peak Rainfall Month:** **{month_names.get(pk_m_int)} (Month {pk_m_int})** — Expected: `{peak_row['Expected_Forecast_mm']} mm` | Storm-Surge Ceiling: `{peak_row['Flood_Tail_88pct_mm']} mm`.")
         with a_col2:
-            st.markdown("**2. Active Flood & Drought Planetary Triggers**")
-            st.markdown(f"- **Rahu/Ketu Water-Sign Storm Pulses:** {'Months ' + ', '.join(str(m) for m in storm_ms) + ' (elevated cyclonic/cloudburst potential)' if storm_ms else 'None above threshold (low nodal storm risk)'}.")
-            st.markdown(f"- **Karka (Cancer) Water Stelliums:** {'Months ' + ', '.join(str(m) for m in canc_ms) + ' (heavy Western Ghats / Idukki & Wayanad inflow)' if canc_ms else 'No multi-planet Cancer stellium'}.")
-            st.markdown(f"- **Synodic Outer-Planet Cycle:** Incorporates Jupiter–Saturn 20-yr *Yuga* phase, 18.6-yr Lunar Nodal cycle, and *Stambhana* stationary motion.")
-    st.markdown("##### 12-Month Extreme Envelope: Drought Floor (Amber) vs. Expected (Navy) vs. Flood Ceiling (Red)")
+            st.markdown("**2. Gravitational & Synodic Climate Drivers**")
+            st.markdown(f"- **Lunar Nodal Tidal Alignment Pulses:** {'Active in **' + burst_str + '** (elevated low-pressure & cloudburst potential)' if storm_ms else 'Low amplitude (minimal tidal-convective amplification)'}.")
+            st.markdown(f"- **Multi-Planet Ecliptic Conjunctions (90°–120°):** {'Active in **' + ', '.join(month_names.get(m) for m in canc_ms) + '** (supports heavy Western Ghats & reservoir catchment inflow)' if canc_ms else 'No dense inner-planet conjunctions'}.")
+            st.markdown("- **Long-Period Orbital Cycles:** Integrates the 20-year Jupiter–Saturn synodic cycle, the 18.6-year lunar nodal precession cycle, and planetary retrograde/stationary velocities.")
+
+    st.markdown("##### 12-Month Rainfall Envelope: Dry Floor (Amber) vs. Expected Forecast (Navy) vs. Storm-Surge Ceiling (Red)")
     st.line_chart(df_ext.set_index("Month")[["Drought_Tail_14pct_mm", "Expected_Forecast_mm", "Flood_Tail_88pct_mm"]], color=["#F59E0B", "#003366", "#FF4B4B"], use_container_width=True)
-    st.dataframe(df_ext, use_container_width=True, hide_index=True)
+    st.dataframe(df_ext.drop(columns=["Astro_Triggers"]), use_container_width=True, hide_index=True)
+
     st.divider()
     st.subheader("10-Year Extreme Regime Scanner (2026–2035)")
     if st.button("Scan 2026–2035 for Severe Flood & Drought Years"):
         scan_rows = []
-        with st.spinner("Scanning planetary synodic & nodal cycles for 2026–2035..."):
+        with st.spinner("Scanning planetary synodic & lunar nodal cycles for 2026–2035..."):
             for sy in range(2026, 2036):
                 df_y, an, _, sn = get_extreme_year_profile(sy)
                 ex_s = float(df_y["Expected_Forecast_mm"].sum())
                 fl_s = float(df_y["Flood_Tail_88pct_mm"].sum())
                 pk_m = float(df_y["Expected_Forecast_mm"].max())
-                scan_rows.append({"Year": sy, "Ardra_Moon": an, "Swati_Moon": sn, "Expected_Annual_mm": round(ex_s, 1), "Flood_Ceiling_mm": round(fl_s, 1), "Peak_Month_mm": round(pk_m, 1), "Regime_Classification": classify_regime(ex_s, pk_m)})
+                scan_rows.append({"Year": sy, "Jun_Lunar_Sector": an, "Oct_Lunar_Sector": sn, "Expected_Annual_mm": round(ex_s, 1), "Storm_Ceiling_mm": round(fl_s, 1), "Peak_Month_mm": round(pk_m, 1), "Regime_Classification": classify_regime(ex_s, pk_m)})
         st.dataframe(pd.DataFrame(scan_rows), use_container_width=True, hide_index=True)
 
 elif active_tab == "🌡️ Temp: Heatwave & 3-Hr Curve":
@@ -492,6 +504,15 @@ elif active_tab == "💨 Wind: Speed, Gales & Calm":
     df_all_w = get_all_sectors_wind_summary(int(sel_year))
     df_all_w = _clean_sec(df_all_w)
     st.dataframe(df_all_w, use_container_width=True, hide_index=True)
+
+
+elif active_tab == "⚡ KSEB: Grid & Dam Inflow":
+    from kseb_ui import render_kseb_tab
+    render_kseb_tab()
+
+elif active_tab == "📈 Weather vs. KSEB Demand":
+    from kseb_weather_corr import render_kseb_weather_corr_tab
+    render_kseb_weather_corr_tab(int(sel_year))
 
 with st.sidebar:
     st.divider()
