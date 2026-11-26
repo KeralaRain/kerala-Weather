@@ -125,7 +125,7 @@ def render_kseb_tab():
     if not df_dam.empty:
         st.dataframe(df_dam, use_container_width=True, hide_index=True)
     else:
-        st.caption("ℹ️ *Note: KSEB's `Energy log forDD.MM.YYYY.xls` contains 30-min station generation & grid demand (shown above). Daily reservoir water levels (ft/m) & MCM inflows arrive in KSEB's separate `Daily Power Position` report—let me know its email subject/filename if you'd like that parsed into the reservoir table too!*")
+        pass
 
     # 5. PRINTABLE & EXPORTABLE 30-MINUTE SCHEDULE TABLE
     st.divider()
@@ -153,3 +153,12 @@ def render_kseb_tab():
         c_dl1, c_dl2 = st.columns(2)
         c_dl1.download_button(f"📊 Download Printable Excel ({sel_k_day}.xlsx)", buf.getvalue(), f"KSEB_Printable_Log_{sel_k_day}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         c_dl2.download_button(f"📄 Download CSV ({sel_k_day}.csv)", df_print.to_csv(index=False), f"KSEB_30Min_Log_{sel_k_day}.csv")
+
+    from pathlib import Path as _DamPath
+    import streamlit.components.v1 as _dam_components
+
+    st.divider()
+    st.subheader("🏞️ Kerala Dams — Monthly & Day-Wise Inflow Prediction")
+    _dam_html = _DamPath(__file__).resolve().parent / "dam_inflow_table.html"
+    if _dam_html.exists():
+        _dam_components.html(_dam_html.read_text(encoding="utf-8"), height=740, scrolling=True)

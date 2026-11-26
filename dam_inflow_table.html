@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kerala Dams Inflow Prediction Table</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #cbd5e1;
+      --border-light: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #475569;
+      --primary: #1d4ed8;
+      --primary-hover: #1e40af;
+      --total-bg: #f1f5f9;
+      --hover-row: #f0f9ff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 8px;
+      font-size: 12px;
+    }
+    .container {
+      max-width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      overflow: hidden;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: #f1f5f9;
+      border-bottom: 1px solid var(--border);
+    }
+    .toolbar-left, .toolbar-right {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+    .title-group h1 { font-size: 14px; font-weight: 700; color: var(--text); }
+    .title-group p { font-size: 11px; color: var(--text-muted); }
+    .search-input {
+      padding: 4px 8px;
+      font-size: 11px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      width: 150px;
+      background: #fff;
+    }
+    .filter-group {
+      display: inline-flex;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .filter-btn {
+      padding: 4px 8px;
+      font-size: 11px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      color: var(--text-muted);
+      border-right: 1px solid var(--border-light);
+    }
+    .filter-btn:last-child { border-right: none; }
+    .filter-btn.active { background: var(--text); color: #fff; font-weight: 600; }
+    .unit-selector {
+      display: inline-flex;
+      background: #e2e8f0;
+      padding: 2px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .unit-btn {
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .unit-btn.active {
+      background: var(--primary);
+      color: #ffffff;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+    }
+    .action-btn {
+      padding: 5px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: #ffffff;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .action-btn:hover { background: #e2e8f0; }
+    .back-btn { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .back-btn:hover { background: var(--primary-hover); }
+    .table-wrapper {
+      width: 100%;
+      overflow-x: auto;
+      max-height: 75vh;
+      position: relative;
+    }
+    table {
+      border-collapse: separate;
+      border-spacing: 0;
+      width: max-content;
+      min-width: 100%;
+      font-variant-numeric: tabular-nums;
+    }
+    th, td {
+      border-right: 1px solid var(--border-light);
+      border-bottom: 1px solid var(--border-light);
+      padding: 3px 5px;
+      text-align: right;
+      white-space: nowrap;
+      font-size: 11px;
+      min-width: 72px;
+      max-width: 84px;
+    }
+    th:first-child, td:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      text-align: left;
+      min-width: 96px;
+      max-width: 96px;
+      background: #f8fafc;
+      border-right: 2px solid var(--border);
+      font-weight: 600;
+    }
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: #f1f5f9;
+      border-bottom: 1px solid var(--border);
+      text-align: center;
+      padding: 4px 3px;
+    }
+    thead th:first-child { z-index: 4; text-align: left; padding-left: 6px; }
+    .dam-name-input {
+      width: 100%;
+      border: 1px solid transparent;
+      background: transparent;
+      font-weight: 700;
+      font-size: 11px;
+      text-align: center;
+      color: var(--text);
+      padding: 1px 2px;
+      border-radius: 3px;
+    }
+    .dam-name-input:hover, .dam-name-input:focus {
+      border-color: var(--primary);
+      background: #ffffff;
+      outline: none;
+    }
+    .param-row th {
+      background: #f8fafc;
+      font-weight: 500;
+      font-size: 10px;
+      color: var(--text-muted);
+      padding: 2px 3px;
+      top: auto;
+      position: static;
+    }
+    .param-row th:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: #f1f5f9;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    .param-input {
+      width: 100%;
+      border: 1px solid transparent;
+      background: transparent;
+      font-size: 10px;
+      text-align: right;
+      color: var(--text-muted);
+      padding: 1px 2px;
+      border-radius: 2px;
+    }
+    .param-input:hover, .param-input:focus {
+      border-color: var(--primary);
+      background: #fff;
+      color: var(--text);
+      outline: none;
+    }
+    tbody tr.month-row:hover td { background-color: var(--hover-row); }
+    .month-link {
+      color: var(--primary);
+      cursor: pointer;
+      text-decoration: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .month-link:hover { text-decoration: underline; }
+    .month-link span.arrow { font-size: 9px; opacity: 0.7; }
+    .cell-input {
+      width: 100%;
+      border: 1px solid transparent;
+      background: transparent;
+      text-align: right;
+      font-size: 11px;
+      font-family: inherit;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+      padding: 1px 2px;
+      border-radius: 2px;
+    }
+    .cell-input:hover, .cell-input:focus {
+      border-color: var(--primary);
+      background: #ffffff;
+      outline: none;
+    }
+    tfoot td {
+      position: sticky;
+      bottom: 0;
+      z-index: 2;
+      background: var(--total-bg);
+      font-weight: 700;
+      border-top: 2px solid var(--border);
+      border-bottom: none;
+      color: var(--text);
+    }
+    tfoot td:first-child { z-index: 3; background: #e2e8f0; }
+    .hidden { display: none !important; }
+    .hint-bar {
+      padding: 5px 12px;
+      font-size: 11px;
+      color: var(--text-muted);
+      background: #fff;
+      border-top: 1px solid var(--border-light);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <button id="backBtn" class="action-btn back-btn hidden" onclick="showMonthlyView()">← All Months</button>
+      <div class="title-group">
+        <h1 id="tableTitle">Kerala Dams — Monthly Inflow Forecast</h1>
+        <p id="tableSubtitle">Click any month on the left for day-wise data • Click headers or values to edit</p>
+      </div>
+    </div>
+    <div class="toolbar-right">
+      <input type="text" id="searchInput" class="search-input" placeholder="Search dam name..." oninput="renderTable()" />
+      <div class="filter-group">
+        <button class="filter-btn active" data-cat="all" onclick="setCategory('all', this)">All</button>
+        <button class="filter-btn" data-cat="hydro" onclick="setCategory('hydro', this)">Hydro</button>
+        <button class="filter-btn" data-cat="irrigation" onclick="setCategory('irrigation', this)">Irrigation</button>
+      </div>
+      <div class="unit-selector" role="group" aria-label="Select display unit">
+        <button class="unit-btn" data-unit="pct" onclick="setUnit('pct', this)">%</button>
+        <button class="unit-btn active" data-unit="m3" onclick="setUnit('m3', this)">Mm³</button>
+        <button class="unit-btn" data-unit="units" onclick="setUnit('units', this)">MU</button>
+      </div>
+      <button class="action-btn" onclick="exportCSV()">Export CSV</button>
+    </div>
+  </div>
+  <div class="table-wrapper">
+    <table id="damTable">
+      <thead id="tableHead"></thead>
+      <tbody id="tableBody"></tbody>
+      <tfoot id="tableFoot"></tfoot>
+    </table>
+  </div>
+  <div class="hint-bar">
+    <span><strong>%</strong> = Inflow % of Dam Max Capacity | <strong>Mm³</strong> = Volume in Million Cubic Meters (Mm³) | <strong>MU</strong> = Generated Electricity (Million Units)</span>
+    <span id="statusText">Showing 37 Kerala Dams</span>
+  </div>
+</div>
+<script>
+  const MONTHS = [
+    { name: "January", days: 31, weight: 0.025 },
+    { name: "February", days: 28, weight: 0.018 },
+    { name: "March", days: 31, weight: 0.015 },
+    { name: "April", days: 30, weight: 0.022 },
+    { name: "May", days: 31, weight: 0.045 },
+    { name: "June", days: 30, weight: 0.185 },
+    { name: "July", days: 31, weight: 0.245 },
+    { name: "August", days: 31, weight: 0.195 },
+    { name: "September", days: 30, weight: 0.105 },
+    { name: "October", days: 31, weight: 0.075 },
+    { name: "November", days: 30, weight: 0.045 },
+    { name: "December", days: 31, weight: 0.025 }
+  ];
+  const INITIAL_DAMS = [
+    { id: 1, name: "Idukki", cat: "hydro", annual: 1850.0, cap: 1996.0, factor: 1.56 },
+    { id: 2, name: "Cheruthoni", cat: "hydro", annual: 620.0, cap: 1996.0, factor: 1.56 },
+    { id: 3, name: "Kulamavu", cat: "hydro", annual: 410.0, cap: 1996.0, factor: 1.56 },
+    { id: 4, name: "Mullaperiyar", cat: "hydro", annual: 780.0, cap: 443.0, factor: 0.85 },
+    { id: 5, name: "Idamalayar", cat: "hydro", annual: 1120.0, cap: 1089.0, factor: 0.34 },
+    { id: 6, name: "Kakki", cat: "hydro", annual: 690.0, cap: 447.0, factor: 1.62 },
+    { id: 7, name: "Pamba", cat: "hydro", annual: 340.0, cap: 39.0, factor: 1.62 },
+    { id: 8, name: "Sholayar", cat: "hydro", annual: 430.0, cap: 153.0, factor: 0.72 },
+    { id: 9, name: "Kuttiyadi", cat: "hydro", annual: 390.0, cap: 120.0, factor: 1.48 },
+    { id: 10, name: "Kakkayam", cat: "hydro", annual: 310.0, cap: 120.0, factor: 1.48 },
+    { id: 11, name: "Mattupetty", cat: "hydro", annual: 145.0, cap: 55.0, factor: 0.65 },
+    { id: 12, name: "Kundala", cat: "hydro", annual: 68.0, cap: 8.0, factor: 0.65 },
+    { id: 13, name: "Anayirankal", cat: "hydro", annual: 115.0, cap: 50.0, factor: 0.58 },
+    { id: 14, name: "Ponmudi", cat: "hydro", annual: 165.0, cap: 51.0, factor: 0.58 },
+    { id: 15, name: "Sengulam", cat: "hydro", annual: 140.0, cap: 7.0, factor: 0.78 },
+    { id: 16, name: "Kallarkutty", cat: "hydro", annual: 220.0, cap: 6.8, factor: 0.44 },
+    { id: 17, name: "Neriamangalam", cat: "hydro", annual: 480.0, cap: 6.0, factor: 0.44 },
+    { id: 18, name: "Banasura Sagar", cat: "hydro", annual: 295.0, cap: 209.0, factor: 0.52 },
+    { id: 19, name: "Malampuzha", cat: "irrigation", annual: 260.0, cap: 226.0, factor: 0.05 },
+    { id: 20, name: "Parambikulam", cat: "irrigation", annual: 490.0, cap: 504.0, factor: 0.38 },
+    { id: 21, name: "Peechi", cat: "irrigation", annual: 185.0, cap: 113.0, factor: 0.03 },
+    { id: 22, name: "Vazhani", cat: "irrigation", annual: 65.0, cap: 18.0, factor: 0 },
+    { id: 23, name: "Chimoni", cat: "irrigation", annual: 195.0, cap: 179.0, factor: 0.04 },
+    { id: 24, name: "Pothundi", cat: "irrigation", annual: 78.0, cap: 51.0, factor: 0 },
+    { id: 25, name: "Mangalam", cat: "irrigation", annual: 52.0, cap: 25.0, factor: 0 },
+    { id: 26, name: "Meenkara", cat: "irrigation", annual: 34.0, cap: 11.0, factor: 0 },
+    { id: 27, name: "Chulliyar", cat: "irrigation", annual: 38.0, cap: 14.0, factor: 0 },
+    { id: 28, name: "Walayar", cat: "irrigation", annual: 42.0, cap: 18.0, factor: 0 },
+    { id: 29, name: "Siruvani", cat: "irrigation", annual: 110.0, cap: 65.0, factor: 0 },
+    { id: 30, name: "Kanjirapuzha", cat: "irrigation", annual: 125.0, cap: 70.0, factor: 0 },
+    { id: 31, name: "Karapuzha", cat: "irrigation", annual: 145.0, cap: 76.0, factor: 0 },
+    { id: 32, name: "Pazhassi", cat: "irrigation", annual: 210.0, cap: 97.0, factor: 0 },
+    { id: 33, name: "Thenmala", cat: "irrigation", annual: 540.0, cap: 505.0, factor: 0.18 },
+    { id: 34, name: "Neyyar", cat: "irrigation", annual: 135.0, cap: 106.0, factor: 0 },
+    { id: 35, name: "Peppara", cat: "irrigation", annual: 118.0, cap: 70.0, factor: 0.06 },
+    { id: 36, name: "Aruvikkara", cat: "irrigation", annual: 95.0, cap: 14.0, factor: 0 },
+    { id: 37, name: "Bhoothathankettu", cat: "irrigation", annual: 890.0, cap: 64.0, factor: 0 }
+  ];
+  let dams = INITIAL_DAMS.map(d => ({ ...d, monthlyM3: MONTHS.map(m => Number((d.annual * m.weight).toFixed(2))) }));
+  let currentUnit = "m3";
+  let currentCat = "all";
+  let selectedMonthIdx = null;
+
+  function setUnit(unit, btn) {
+    currentUnit = unit;
+    document.querySelectorAll(".unit-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    renderTable();
+  }
+  function setCategory(cat, btn) {
+    currentCat = cat;
+    document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    renderTable();
+  }
+  function showDailyView(monthIdx) {
+    selectedMonthIdx = monthIdx;
+    document.getElementById("backBtn").classList.remove("hidden");
+    document.getElementById("tableTitle").textContent = `${MONTHS[monthIdx].name} — Day-Wise Inflow Breakdown`;
+    document.getElementById("tableSubtitle").textContent = `Showing all ${MONTHS[monthIdx].days} days • Switch %, m³, or Units at top right`;
+    renderTable();
+  }
+  function showMonthlyView() {
+    selectedMonthIdx = null;
+    document.getElementById("backBtn").classList.add("hidden");
+    document.getElementById("tableTitle").textContent = "Kerala Dams — Monthly Inflow Forecast";
+    document.getElementById("tableSubtitle").textContent = "Click any month on the left for day-wise data • Click headers or values to edit";
+    renderTable();
+  }
+  function getFilteredDams() {
+    const query = document.getElementById("searchInput").value.trim().toLowerCase();
+    return dams.map((dam, originalIdx) => ({ dam, originalIdx })).filter(({ dam }) => {
+      const matchesCat = currentCat === "all" || dam.cat === currentCat;
+      const matchesSearch = dam.name.toLowerCase().includes(query);
+      return matchesCat && matchesSearch;
+    });
+  }
+  function convertFromM3(m3Val, dam) {
+    if (currentUnit === "pct") return dam.cap > 0 ? (m3Val / dam.cap) * 100 : 0;
+    if (currentUnit === "units") return m3Val * dam.factor;
+    return m3Val;
+  }
+  function convertToM3(displayVal, dam) {
+    if (currentUnit === "pct") return (displayVal / 100) * dam.cap;
+    if (currentUnit === "units") return dam.factor > 0 ? displayVal / dam.factor : 0;
+    return displayVal;
+  }
+  function formatNumber(val) {
+    if (currentUnit === "pct") return val.toFixed(1) + "%";
+    return val.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function formatRawInput(val) {
+    if (currentUnit === "pct") return val.toFixed(1);
+    return val.toFixed(2);
+  }
+  function getDailyM3Series(monthlyM3, daysCount, damId, monthIdx) {
+    const rawWeights = [];
+    let weightSum = 0;
+    for (let d = 0; d < daysCount; d++) {
+      const wave = 1 + 0.28 * Math.sin(((d + damId + monthIdx) / daysCount) * Math.PI * 2);
+      rawWeights.push(wave);
+      weightSum += wave;
+    }
+    const daily = rawWeights.map(w => Math.round((w / weightSum) * monthlyM3));
+    daily[daysCount - 1] += monthlyM3 - daily.reduce((a, b) => a + b, 0);
+    return daily;
+  }
+  function renderTable() {
+    const visibleDams = getFilteredDams();
+    const thead = document.getElementById("tableHead");
+    const tbody = document.getElementById("tableBody");
+    const tfoot = document.getElementById("tableFoot");
+    document.getElementById("statusText").textContent = `Showing ${visibleDams.length} of ${dams.length} Dams`;
+
+    let headHTML = `<tr><th>${selectedMonthIdx === null ? "Month" : "Day"}</th>`;
+    visibleDams.forEach(({ dam, originalIdx }) => {
+      headHTML += `<th><input class="dam-name-input" type="text" value="${dam.name}" onchange="updateDamName(${originalIdx}, this.value)" /></th>`;
+    });
+    headHTML += `</tr><tr class="param-row"><th>Cap (Mm³)</th>`;
+    visibleDams.forEach(({ dam, originalIdx }) => {
+      headHTML += `<th><input class="param-input" type="number" value="${dam.cap}" onchange="updateDamCap(${originalIdx}, this.value)" /></th>`;
+    });
+    headHTML += `</tr><tr class="param-row"><th>MU/Mm³</th>`;
+    visibleDams.forEach(({ dam, originalIdx }) => {
+      headHTML += `<th><input class="param-input" type="number" step="0.01" value="${dam.factor}" onchange="updateDamFactor(${originalIdx}, this.value)" /></th>`;
+    });
+    headHTML += `</tr>`;
+    thead.innerHTML = headHTML;
+
+    let bodyHTML = "";
+    const colTotalsM3 = new Array(visibleDams.length).fill(0);
+
+    if (selectedMonthIdx === null) {
+      MONTHS.forEach((m, mIdx) => {
+        bodyHTML += `<tr class="month-row"><td><a class="month-link" onclick="showDailyView(${mIdx})"><span>${m.name}</span><span class="arrow">▶</span></a></td>`;
+        visibleDams.forEach(({ dam, originalIdx }, vIdx) => {
+          const m3Val = dam.monthlyM3[mIdx];
+          colTotalsM3[vIdx] += m3Val;
+          const dispVal = convertFromM3(m3Val, dam);
+          bodyHTML += `<td><input class="cell-input" type="number" step="any" value="${formatRawInput(dispVal)}" onchange="updateMonthlyCell(${originalIdx}, ${mIdx}, this.value)" /></td>`;
+        });
+        bodyHTML += `</tr>`;
+      });
+      let footHTML = `<tr><td>Annual Total</td>`;
+      visibleDams.forEach(({ dam }, vIdx) => {
+        footHTML += `<td>${formatNumber(convertFromM3(colTotalsM3[vIdx], dam))}</td>`;
+      });
+      tfoot.innerHTML = footHTML + `</tr>`;
+    } else {
+      const monthObj = MONTHS[selectedMonthIdx];
+      const dailySeriesByCol = visibleDams.map(({ dam }) => getDailyM3Series(dam.monthlyM3[selectedMonthIdx], monthObj.days, dam.id, selectedMonthIdx));
+      for (let d = 0; d < monthObj.days; d++) {
+        bodyHTML += `<tr><td>Day ${d + 1}</td>`;
+        visibleDams.forEach(({ dam }, vIdx) => {
+          const dayM3 = dailySeriesByCol[vIdx][d];
+          colTotalsM3[vIdx] += dayM3;
+          bodyHTML += `<td>${formatNumber(convertFromM3(dayM3, dam))}</td>`;
+        });
+        bodyHTML += `</tr>`;
+      }
+      let footHTML = `<tr><td>${monthObj.name} Total</td>`;
+      visibleDams.forEach(({ dam }, vIdx) => {
+        footHTML += `<td>${formatNumber(convertFromM3(colTotalsM3[vIdx], dam))}</td>`;
+      });
+      tfoot.innerHTML = footHTML + `</tr>`;
+    }
+    tbody.innerHTML = bodyHTML;
+  }
+  function updateDamName(damIdx, newName) { if (newName.trim()) dams[damIdx].name = newName.trim(); renderTable(); }
+  function updateDamCap(damIdx, newCap) { const v = parseFloat(newCap); if (!isNaN(v) && v >= 0) dams[damIdx].cap = v; renderTable(); }
+  function updateDamFactor(damIdx, newFactor) { const v = parseFloat(newFactor); if (!isNaN(v) && v >= 0) dams[damIdx].factor = v; renderTable(); }
+  function updateMonthlyCell(damIdx, monthIdx, newVal) { const v = parseFloat(newVal); if (!isNaN(v) && v >= 0) dams[damIdx].monthlyM3[monthIdx] = Number(convertToM3(v, dams[damIdx]).toFixed(2)); renderTable(); }
+  function exportCSV() {
+    const visibleDams = getFilteredDams();
+    const unitLabel = currentUnit === "pct" ? "Capacity_Pct" : currentUnit === "units" ? "Generated_MU" : "Inflow_Mm3";
+    const rows = [[`${selectedMonthIdx === null ? "Month" : "Day"} (${unitLabel})`, ...visibleDams.map(({ dam }) => `"${dam.name}"`)].join(",")];
+    const totals = new Array(visibleDams.length).fill(0);
+    if (selectedMonthIdx === null) {
+      MONTHS.forEach((m, mIdx) => {
+        const r = [m.name];
+        visibleDams.forEach(({ dam }, vIdx) => {
+          const m3Val = dam.monthlyM3[mIdx]; totals[vIdx] += m3Val;
+          const d = convertFromM3(m3Val, dam);
+          r.push(currentUnit === "pct" ? d.toFixed(2) : Math.round(d));
+        });
+        rows.push(r.join(","));
+      });
+      const tr = ["Annual Total"];
+      visibleDams.forEach(({ dam }, vIdx) => { const d = convertFromM3(totals[vIdx], dam); tr.push(currentUnit === "pct" ? d.toFixed(2) : Math.round(d)); });
+      rows.push(tr.join(","));
+    } else {
+      const monthObj = MONTHS[selectedMonthIdx];
+      const series = visibleDams.map(({ dam }) => getDailyM3Series(dam.monthlyM3[selectedMonthIdx], monthObj.days, dam.id, selectedMonthIdx));
+      for (let d = 0; d < monthObj.days; d++) {
+        const r = [`Day ${d + 1}`];
+        visibleDams.forEach(({ dam }, vIdx) => {
+          const m3Val = series[vIdx][d]; totals[vIdx] += m3Val;
+          const disp = convertFromM3(m3Val, dam);
+          r.push(currentUnit === "pct" ? disp.toFixed(2) : Math.round(disp));
+        });
+        rows.push(r.join(","));
+      }
+      const tr = [`${monthObj.name} Total`];
+      visibleDams.forEach(({ dam }, vIdx) => { const d = convertFromM3(totals[vIdx], dam); tr.push(currentUnit === "pct" ? d.toFixed(2) : Math.round(d)); });
+      rows.push(tr.join(","));
+    }
+    const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${selectedMonthIdx === null ? "Kerala_Dams_Annual" : "Kerala_Dams_" + MONTHS[selectedMonthIdx].name}_${unitLabel}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+  renderTable();
+</script>
+</body>
+</html>

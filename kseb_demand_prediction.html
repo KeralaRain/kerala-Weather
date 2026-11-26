@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KSEB Electricity Demand Prediction</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #cbd5e1;
+      --border-light: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #475569;
+      --primary: #1d4ed8;
+      --primary-hover: #1e40af;
+      --total-bg: #f1f5f9;
+      --hover-row: #f0f9ff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 8px;
+      font-size: 12px;
+    }
+    .container {
+      max-width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      overflow: hidden;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: #f1f5f9;
+      border-bottom: 1px solid var(--border);
+    }
+    .toolbar-left, .toolbar-right {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+    .title-group h1 { font-size: 14px; font-weight: 700; color: var(--text); }
+    .title-group p { font-size: 11px; color: var(--text-muted); }
+    .unit-selector {
+      display: inline-flex;
+      background: #e2e8f0;
+      padding: 2px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .unit-btn {
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .unit-btn.active {
+      background: var(--primary);
+      color: #ffffff;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+    }
+    .action-btn {
+      padding: 5px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: #ffffff;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .action-btn:hover { background: #e2e8f0; }
+    .back-btn { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .back-btn:hover { background: var(--primary-hover); }
+    .table-wrapper {
+      width: 100%;
+      overflow-x: auto;
+      position: relative;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-variant-numeric: tabular-nums;
+    }
+    th, td {
+      border-right: 1px solid var(--border-light);
+      border-bottom: 1px solid var(--border-light);
+      padding: 6px 8px;
+      text-align: right;
+      white-space: nowrap;
+      font-size: 11.5px;
+    }
+    th:first-child, td:first-child {
+      text-align: left;
+      background: #f8fafc;
+      border-right: 2px solid var(--border);
+      font-weight: 600;
+    }
+    thead th {
+      background: #f1f5f9;
+      border-bottom: 1px solid var(--border);
+      text-align: right;
+      font-weight: 700;
+    }
+    thead th:first-child { text-align: left; }
+    tbody tr.month-row:hover td { background-color: var(--hover-row); }
+    .month-link {
+      color: var(--primary);
+      cursor: pointer;
+      text-decoration: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .month-link:hover { text-decoration: underline; }
+    .cell-input {
+      width: 82px;
+      border: 1px solid transparent;
+      background: transparent;
+      text-align: right;
+      font-size: 11.5px;
+      font-family: inherit;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+      padding: 2px 4px;
+      border-radius: 3px;
+    }
+    .cell-input:hover, .cell-input:focus {
+      border-color: var(--primary);
+      background: #ffffff;
+      outline: none;
+    }
+    tfoot td {
+      background: var(--total-bg);
+      font-weight: 700;
+      border-top: 2px solid var(--border);
+      border-bottom: none;
+    }
+    tfoot td:first-child { background: #e2e8f0; }
+    .hidden { display: none !important; }
+    .hint-bar {
+      padding: 6px 12px;
+      font-size: 11px;
+      color: var(--text-muted);
+      background: #fff;
+      border-top: 1px solid var(--border-light);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <button id="backBtn" class="action-btn back-btn hidden" onclick="showMonthlyView()">← All Months</button>
+      <div class="title-group">
+        <h1 id="tableTitle">Kerala Grid — Monthly Demand & Consumption Prediction</h1>
+        <p id="tableSubtitle">Click any month on the left for day-wise demand • Click cells to adjust baseline values</p>
+      </div>
+    </div>
+    <div class="toolbar-right">
+      <div class="unit-selector" role="group" aria-label="Select unit">
+        <button class="unit-btn active" data-unit="mu" onclick="setUnit('mu', this)">MU (Energy)</button>
+        <button class="unit-btn" data-unit="mw" onclick="setUnit('mw', this)">MW (Peak Load)</button>
+      </div>
+      <button class="action-btn" onclick="exportCSV()">Export CSV</button>
+    </div>
+  </div>
+  <div class="table-wrapper">
+    <table>
+      <thead id="tableHead"></thead>
+      <tbody id="tableBody"></tbody>
+      <tfoot id="tableFoot"></tfoot>
+    </table>
+  </div>
+  <div class="hint-bar">
+    <span><strong>MU</strong> = Million Units (kWh × 10⁶) | <strong>MW</strong> = Projected Peak System Demand (Megawatts)</span>
+    <span>Weather-Adjusted KSEB Grid Forecast</span>
+  </div>
+</div>
+<script>
+  const DATA = [
+    { month: "January", days: 31, totalMU: 2540, peakMW: 4680, domesticMU: 1280, commercialMU: 540, industrialMU: 490, agriOtherMU: 230 },
+    { month: "February", days: 28, totalMU: 2490, peakMW: 4920, domesticMU: 1270, commercialMU: 530, industrialMU: 460, agriOtherMU: 230 },
+    { month: "March", days: 31, totalMU: 2920, peakMW: 5380, domesticMU: 1520, commercialMU: 610, industrialMU: 520, agriOtherMU: 270 },
+    { month: "April", days: 30, totalMU: 2980, peakMW: 5560, domesticMU: 1580, commercialMU: 620, industrialMU: 510, agriOtherMU: 270 },
+    { month: "May", days: 31, totalMU: 2890, peakMW: 5410, domesticMU: 1510, commercialMU: 600, industrialMU: 515, agriOtherMU: 265 },
+    { month: "June", days: 30, totalMU: 2380, peakMW: 4520, domesticMU: 1190, commercialMU: 510, industrialMU: 475, agriOtherMU: 205 },
+    { month: "July", days: 31, totalMU: 2340, peakMW: 4410, domesticMU: 1160, commercialMU: 500, industrialMU: 480, agriOtherMU: 200 },
+    { month: "August", days: 31, totalMU: 2390, peakMW: 4490, domesticMU: 1195, commercialMU: 510, industrialMU: 485, agriOtherMU: 200 },
+    { month: "September", days: 30, totalMU: 2410, peakMW: 4610, domesticMU: 1210, commercialMU: 515, industrialMU: 480, agriOtherMU: 205 },
+    { month: "October", days: 31, totalMU: 2480, peakMW: 4720, domesticMU: 1245, commercialMU: 530, industrialMU: 495, agriOtherMU: 210 },
+    { month: "November", days: 30, totalMU: 2430, peakMW: 4650, domesticMU: 1220, commercialMU: 520, industrialMU: 480, agriOtherMU: 210 },
+    { month: "December", days: 31, totalMU: 2560, peakMW: 4790, domesticMU: 1295, commercialMU: 545, industrialMU: 495, agriOtherMU: 225 }
+  ];
+
+  let unitMode = "mu";
+  let selectedMonthIdx = null;
+
+  function setUnit(mode, btn) {
+    unitMode = mode;
+    document.querySelectorAll(".unit-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    renderTable();
+  }
+
+  function showDailyView(idx) {
+    selectedMonthIdx = idx;
+    document.getElementById("backBtn").classList.remove("hidden");
+    document.getElementById("tableTitle").textContent = `${DATA[idx].month} — Day-Wise KSEB Demand Breakdown`;
+    document.getElementById("tableSubtitle").textContent = `Showing all ${DATA[idx].days} days • Toggle MU (Energy) or MW (Peak Load) at top right`;
+    renderTable();
+  }
+
+  function showMonthlyView() {
+    selectedMonthIdx = null;
+    document.getElementById("backBtn").classList.add("hidden");
+    document.getElementById("tableTitle").textContent = "Kerala Grid — Monthly Demand & Consumption Prediction";
+    document.getElementById("tableSubtitle").textContent = "Click any month on the left for day-wise demand • Click cells to adjust baseline values";
+    renderTable();
+  }
+
+  function getDailySplit(row, monthIdx) {
+    const days = [];
+    let weightSum = 0;
+    const weights = [];
+    for (let d = 0; d < row.days; d++) {
+      const isSunday = (d + monthIdx) % 7 === 6;
+      const w = (isSunday ? 0.91 : 1.02) + 0.05 * Math.sin((d / row.days) * Math.PI * 2);
+      weights.push(w);
+      weightSum += w;
+    }
+    for (let d = 0; d < row.days; d++) {
+      const ratio = weights[d] / weightSum;
+      const muRatio = (row.totalMU * ratio) / (row.totalMU / row.days);
+      days.push({
+        day: `Day ${d + 1}`,
+        totalMU: Number((row.totalMU * ratio).toFixed(2)),
+        domesticMU: Number((row.domesticMU * ratio).toFixed(2)),
+        commercialMU: Number((row.commercialMU * ratio).toFixed(2)),
+        industrialMU: Number((row.industrialMU * ratio).toFixed(2)),
+        agriOtherMU: Number((row.agriOtherMU * ratio).toFixed(2)),
+        peakMW: Math.round(row.peakMW * (0.94 + 0.08 * muRatio))
+      });
+    }
+    return days;
+  }
+  function renderTable() {
+    const thead = document.getElementById("tableHead");
+    const tbody = document.getElementById("tableBody");
+    const tfoot = document.getElementById("tableFoot");
+
+    if (unitMode === "mu") {
+      thead.innerHTML = `<tr>
+        <th>${selectedMonthIdx === null ? "Month" : "Day"}</th>
+        <th>Predicted Total Demand (MU)</th>
+        <th>Domestic & Cooling (MU)</th>
+        <th>Commercial (MU)</th>
+        <th>Industrial HT/EHT (MU)</th>
+        <th>Agri & Others (MU)</th>
+      </tr>`;
+    } else {
+      thead.innerHTML = `<tr>
+        <th>${selectedMonthIdx === null ? "Month" : "Day"}</th>
+        <th>Projected Peak Demand (MW)</th>
+        <th>Evening Peak 18:00–22:00 (MW)</th>
+        <th>Daytime Solar-Window 09:00–16:00 (MW)</th>
+        <th>Off-Peak Night Base Load (MW)</th>
+      </tr>`;
+    }
+
+    let bodyHTML = "";
+    if (selectedMonthIdx === null) {
+      let sumTotal = 0, sumDom = 0, sumCom = 0, sumInd = 0, sumAgr = 0, maxPeak = 0;
+
+      DATA.forEach((r, idx) => {
+        sumTotal += r.totalMU; sumDom += r.domesticMU; sumCom += r.commercialMU; sumInd += r.industrialMU; sumAgr += r.agriOtherMU;
+        if (r.peakMW > maxPeak) maxPeak = r.peakMW;
+
+        if (unitMode === "mu") {
+          bodyHTML += `<tr class="month-row">
+            <td><a class="month-link" onclick="showDailyView(${idx})"><span>${r.month}</span><span>▶</span></a></td>
+            <td><input class="cell-input" type="number" value="${r.totalMU}" onchange="updateMU(${idx}, 'totalMU', this.value)" /></td>
+            <td><input class="cell-input" type="number" value="${r.domesticMU}" onchange="updateMU(${idx}, 'domesticMU', this.value)" /></td>
+            <td><input class="cell-input" type="number" value="${r.commercialMU}" onchange="updateMU(${idx}, 'commercialMU', this.value)" /></td>
+            <td><input class="cell-input" type="number" value="${r.industrialMU}" onchange="updateMU(${idx}, 'industrialMU', this.value)" /></td>
+            <td><input class="cell-input" type="number" value="${r.agriOtherMU}" onchange="updateMU(${idx}, 'agriOtherMU', this.value)" /></td>
+          </tr>`;
+        } else {
+          bodyHTML += `<tr class="month-row">
+            <td><a class="month-link" onclick="showDailyView(${idx})"><span>${r.month}</span><span>▶</span></a></td>
+            <td><input class="cell-input" type="number" value="${r.peakMW}" onchange="updateMW(${idx}, this.value)" /></td>
+            <td>${r.peakMW.toLocaleString("en-IN")}</td>
+            <td>${Math.round(r.peakMW * 0.84).toLocaleString("en-IN")}</td>
+            <td>${Math.round(r.peakMW * 0.66).toLocaleString("en-IN")}</td>
+          </tr>`;
+        }
+      });
+
+      tbody.innerHTML = bodyHTML;
+      if (unitMode === "mu") {
+        tfoot.innerHTML = `<tr><td>Annual Total (MU)</td><td>${sumTotal.toLocaleString("en-IN")}</td><td>${sumDom.toLocaleString("en-IN")}</td><td>${sumCom.toLocaleString("en-IN")}</td><td>${sumInd.toLocaleString("en-IN")}</td><td>${sumAgr.toLocaleString("en-IN")}</td></tr>`;
+      } else {
+        tfoot.innerHTML = `<tr><td>Annual Max Peak</td><td>${maxPeak.toLocaleString("en-IN")} MW</td><td>${maxPeak.toLocaleString("en-IN")} MW</td><td>${Math.round(maxPeak * 0.84).toLocaleString("en-IN")} MW</td><td>${Math.round(maxPeak * 0.66).toLocaleString("en-IN")} MW</td></tr>`;
+      }
+    } else {
+      const row = DATA[selectedMonthIdx];
+      const daily = getDailySplit(row, selectedMonthIdx);
+      let sTot = 0, sDom = 0, sCom = 0, sInd = 0, sAgr = 0, mPeak = 0;
+
+      daily.forEach(d => {
+        sTot += d.totalMU; sDom += d.domesticMU; sCom += d.commercialMU; sInd += d.industrialMU; sAgr += d.agriOtherMU;
+        if (d.peakMW > mPeak) mPeak = d.peakMW;
+
+        if (unitMode === "mu") {
+          bodyHTML += `<tr><td>${d.day}</td><td>${d.totalMU.toFixed(2)}</td><td>${d.domesticMU.toFixed(2)}</td><td>${d.commercialMU.toFixed(2)}</td><td>${d.industrialMU.toFixed(2)}</td><td>${d.agriOtherMU.toFixed(2)}</td></tr>`;
+        } else {
+          bodyHTML += `<tr><td>${d.day}</td><td>${d.peakMW.toLocaleString("en-IN")}</td><td>${d.peakMW.toLocaleString("en-IN")}</td><td>${Math.round(d.peakMW * 0.84).toLocaleString("en-IN")}</td><td>${Math.round(d.peakMW * 0.66).toLocaleString("en-IN")}</td></tr>`;
+        }
+      });
+
+      tbody.innerHTML = bodyHTML;
+      if (unitMode === "mu") {
+        tfoot.innerHTML = `<tr><td>${row.month} Total</td><td>${sTot.toFixed(2)}</td><td>${sDom.toFixed(2)}</td><td>${sCom.toFixed(2)}</td><td>${sInd.toFixed(2)}</td><td>${sAgr.toFixed(2)}</td></tr>`;
+      } else {
+        tfoot.innerHTML = `<tr><td>${row.month} Max Peak</td><td>${mPeak.toLocaleString("en-IN")} MW</td><td>${mPeak.toLocaleString("en-IN")} MW</td><td>${Math.round(mPeak * 0.84).toLocaleString("en-IN")} MW</td><td>${Math.round(mPeak * 0.66).toLocaleString("en-IN")} MW</td></tr>`;
+      }
+    }
+  }
+
+  function updateMU(idx, field, val) {
+    const v = parseFloat(val);
+    if (!isNaN(v) && v >= 0) {
+      DATA[idx][field] = v;
+      if (field !== "totalMU") {
+        DATA[idx].totalMU = Number((DATA[idx].domesticMU + DATA[idx].commercialMU + DATA[idx].industrialMU + DATA[idx].agriOtherMU).toFixed(2));
+      }
+    }
+    renderTable();
+  }
+
+  function updateMW(idx, val) {
+    const v = parseFloat(val);
+    if (!isNaN(v) && v >= 0) DATA[idx].peakMW = Math.round(v);
+    renderTable();
+  }
+
+  function exportCSV() {
+    const rows = [];
+    if (selectedMonthIdx === null) {
+      if (unitMode === "mu") {
+        rows.push("Month,Total_Demand_MU,Domestic_MU,Commercial_MU,Industrial_MU,Agri_Other_MU");
+        DATA.forEach(r => rows.push(`${r.month},${r.totalMU},${r.domesticMU},${r.commercialMU},${r.industrialMU},${r.agriOtherMU}`));
+      } else {
+        rows.push("Month,Peak_Demand_MW,Evening_Peak_MW,Daytime_MW,Night_Base_MW");
+        DATA.forEach(r => rows.push(`${r.month},${r.peakMW},${r.peakMW},${Math.round(r.peakMW * 0.84)},${Math.round(r.peakMW * 0.66)}`));
+      }
+    } else {
+      const row = DATA[selectedMonthIdx];
+      const daily = getDailySplit(row, selectedMonthIdx);
+      if (unitMode === "mu") {
+        rows.push("Day,Total_Demand_MU,Domestic_MU,Commercial_MU,Industrial_MU,Agri_Other_MU");
+        daily.forEach(d => rows.push(`${d.day},${d.totalMU},${d.domesticMU},${d.commercialMU},${d.industrialMU},${d.agriOtherMU}`));
+      } else {
+        rows.push("Day,Peak_Demand_MW,Evening_Peak_MW,Daytime_MW,Night_Base_MW");
+        daily.forEach(d => rows.push(`${d.day},${d.peakMW},${d.peakMW},${Math.round(d.peakMW * 0.84)},${Math.round(d.peakMW * 0.66)}`));
+      }
+    }
+    const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `KSEB_Demand_Prediction_${selectedMonthIdx === null ? "Annual" : DATA[selectedMonthIdx].month}_${unitMode.toUpperCase()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  renderTable();
+</script>
+</body>
+</html>

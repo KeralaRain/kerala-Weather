@@ -507,12 +507,26 @@ elif active_tab == "💨 Wind: Speed, Gales & Calm":
 
 
 elif active_tab == "⚡ KSEB: Grid & Dam Inflow":
-    from kseb_ui import render_kseb_tab
-    render_kseb_tab()
+    from kseb_auth_install import require_kseb_cug_login
+    if require_kseb_cug_login():
+        from kseb_ui import render_kseb_tab
+        render_kseb_tab()
+
 
 elif active_tab == "📈 Weather vs. KSEB Demand":
-    from kseb_weather_corr import render_kseb_weather_corr_tab
-    render_kseb_weather_corr_tab(int(sel_year))
+    from kseb_auth_install import require_kseb_cug_login
+    if require_kseb_cug_login():
+        from kseb_weather_corr import render_kseb_weather_corr_tab
+        render_kseb_weather_corr_tab(int(sel_year))
+
+    from pathlib import Path as _DemPath
+    import streamlit.components.v1 as _dem_components
+
+    st.divider()
+    st.subheader("📈 KSEB Grid — Monthly & Day-Wise Demand Prediction")
+    _dem_html = _DemPath(__file__).resolve().parent / "kseb_demand_prediction.html"
+    if _dem_html.exists():
+        _dem_components.html(_dem_html.read_text(encoding="utf-8"), height=540, scrolling=True)
 
 with st.sidebar:
     st.divider()
@@ -532,3 +546,7 @@ with st.sidebar:
         st.session_state["xlsx_bytes"] = buf.getvalue()
     if "xlsx_bytes" in st.session_state:
         st.download_button(label=f"📊 Download {sel_year} Full Excel (.xlsx)", data=st.session_state["xlsx_bytes"], file_name=f"Kerala_Monsoon_Forecast{sel_year}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+from kseb_auth_install import render_download_install_box
+render_download_install_box()
+
