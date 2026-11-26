@@ -159,6 +159,7 @@ def render_kseb_tab():
 
     st.divider()
     st.subheader("🏞️ Kerala Dams — Monthly & Day-Wise Inflow Prediction")
-    _dam_html = _DamPath(__file__).resolve().parent / "dam_inflow_table.html"
-    if _dam_html.exists():
-        _dam_components.html(_dam_html.read_text(encoding="utf-8"), height=740, scrolling=True)
+    from kseb_db_bridge import render_live_dam_inflow_table as _render_live_dam
+    _dam_rendered = _render_live_dam("dam_inflow_table.html")
+    if _dam_rendered:
+        _dam_components.html(_dam_rendered, height=740, scrolling=True)

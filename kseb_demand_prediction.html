@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>KSEB Electricity Demand Prediction</title>
+  <title>KSEB Supply vs. Demand Prediction</title>
   <style>
     :root {
       --bg: #f8fafc;
@@ -16,6 +16,10 @@
       --primary-hover: #1e40af;
       --total-bg: #f1f5f9;
       --hover-row: #f0f9ff;
+      --surplus-bg: #ecfdf5;
+      --surplus-text: #047857;
+      --deficit-bg: #fef2f2;
+      --deficit-text: #b91c1c;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -99,12 +103,15 @@
     th, td {
       border-right: 1px solid var(--border-light);
       border-bottom: 1px solid var(--border-light);
-      padding: 6px 8px;
+      padding: 4px 5px;
       text-align: right;
       white-space: nowrap;
-      font-size: 11.5px;
+      font-size: 11px;
     }
     th:first-child, td:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 2;
       text-align: left;
       background: #f8fafc;
       border-right: 2px solid var(--border);
@@ -125,18 +132,19 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 6px;
     }
     .month-link:hover { text-decoration: underline; }
     .cell-input {
-      width: 82px;
+      width: 56px;
       border: 1px solid transparent;
       background: transparent;
       text-align: right;
-      font-size: 11.5px;
+      font-size: 11px;
       font-family: inherit;
       font-variant-numeric: tabular-nums;
       color: var(--text);
-      padding: 2px 4px;
+      padding: 1px 3px;
       border-radius: 3px;
     }
     .cell-input:hover, .cell-input:focus {
@@ -144,6 +152,9 @@
       background: #ffffff;
       outline: none;
     }
+    .supply-col { background-color: #f8fafc; font-weight: 600; }
+    .surplus { background-color: var(--surplus-bg) !important; color: var(--surplus-text); font-weight: 700; }
+    .deficit { background-color: var(--deficit-bg) !important; color: var(--deficit-text); font-weight: 700; }
     tfoot td {
       background: var(--total-bg);
       font-weight: 700;
@@ -171,8 +182,8 @@
     <div class="toolbar-left">
       <button id="backBtn" class="action-btn back-btn hidden" onclick="showMonthlyView()">← All Months</button>
       <div class="title-group">
-        <h1 id="tableTitle">Kerala Grid — Monthly Demand & Consumption Prediction</h1>
-        <p id="tableSubtitle">Click any month on the left for day-wise demand • Click cells to adjust baseline values</p>
+        <h1 id="tableTitle">Kerala Grid — Supply vs. Demand Prediction (Surplus / Deficit)</h1>
+        <p id="tableSubtitle">Click any month on the left for day-wise breakdown • Click cells to adjust supply or demand</p>
       </div>
     </div>
     <div class="toolbar-right">
@@ -191,24 +202,24 @@
     </table>
   </div>
   <div class="hint-bar">
-    <span><strong>MU</strong> = Million Units (kWh × 10⁶) | <strong>MW</strong> = Projected Peak System Demand (Megawatts)</span>
-    <span>Weather-Adjusted KSEB Grid Forecast</span>
+    <span><strong>Total Supply</strong> = Hydro + Central Share + IPP/Solar | <strong style="color:#047857;">+Surplus</strong> / <strong style="color:#b91c1c;">−Deficit</strong> = Total Supply − Predicted Demand</span>
+    <span>Click any month row for daily balance</span>
   </div>
 </div>
 <script>
   const DATA = [
-    { month: "January", days: 31, totalMU: 2540, peakMW: 4680, domesticMU: 1280, commercialMU: 540, industrialMU: 490, agriOtherMU: 230 },
-    { month: "February", days: 28, totalMU: 2490, peakMW: 4920, domesticMU: 1270, commercialMU: 530, industrialMU: 460, agriOtherMU: 230 },
-    { month: "March", days: 31, totalMU: 2920, peakMW: 5380, domesticMU: 1520, commercialMU: 610, industrialMU: 520, agriOtherMU: 270 },
-    { month: "April", days: 30, totalMU: 2980, peakMW: 5560, domesticMU: 1580, commercialMU: 620, industrialMU: 510, agriOtherMU: 270 },
-    { month: "May", days: 31, totalMU: 2890, peakMW: 5410, domesticMU: 1510, commercialMU: 600, industrialMU: 515, agriOtherMU: 265 },
-    { month: "June", days: 30, totalMU: 2380, peakMW: 4520, domesticMU: 1190, commercialMU: 510, industrialMU: 475, agriOtherMU: 205 },
-    { month: "July", days: 31, totalMU: 2340, peakMW: 4410, domesticMU: 1160, commercialMU: 500, industrialMU: 480, agriOtherMU: 200 },
-    { month: "August", days: 31, totalMU: 2390, peakMW: 4490, domesticMU: 1195, commercialMU: 510, industrialMU: 485, agriOtherMU: 200 },
-    { month: "September", days: 30, totalMU: 2410, peakMW: 4610, domesticMU: 1210, commercialMU: 515, industrialMU: 480, agriOtherMU: 205 },
-    { month: "October", days: 31, totalMU: 2480, peakMW: 4720, domesticMU: 1245, commercialMU: 530, industrialMU: 495, agriOtherMU: 210 },
-    { month: "November", days: 30, totalMU: 2430, peakMW: 4650, domesticMU: 1220, commercialMU: 520, industrialMU: 480, agriOtherMU: 210 },
-    { month: "December", days: 31, totalMU: 2560, peakMW: 4790, domesticMU: 1295, commercialMU: 545, industrialMU: 495, agriOtherMU: 225 }
+    { month: "January", days: 31, demandMU: 2540, hydroMU: 580, centralMU: 1420, ippSolarMU: 410, demandMW: 4680, hydroMW: 1320, centralMW: 2350, ippSolarMW: 740 },
+    { month: "February", days: 28, demandMU: 2490, hydroMU: 520, centralMU: 1360, ippSolarMU: 420, demandMW: 4920, hydroMW: 1280, centralMW: 2380, ippSolarMW: 780 },
+    { month: "March", days: 31, demandMU: 2920, hydroMU: 610, centralMU: 1510, ippSolarMU: 480, demandMW: 5380, hydroMW: 1450, centralMW: 2460, ippSolarMW: 860 },
+    { month: "April", days: 30, demandMU: 2980, hydroMU: 590, centralMU: 1490, ippSolarMU: 490, demandMW: 5560, hydroMW: 1480, centralMW: 2450, ippSolarMW: 890 },
+    { month: "May", days: 31, demandMU: 2890, hydroMU: 630, centralMU: 1480, ippSolarMU: 470, demandMW: 5410, hydroMW: 1510, centralMW: 2440, ippSolarMW: 840 },
+    { month: "June", days: 30, demandMU: 2380, hydroMU: 760, centralMU: 1390, ippSolarMU: 340, demandMW: 4520, hydroMW: 1620, centralMW: 2390, ippSolarMW: 620 },
+    { month: "July", days: 31, demandMU: 2340, hydroMU: 920, centralMU: 1360, ippSolarMU: 310, demandMW: 4410, hydroMW: 1790, centralMW: 2360, ippSolarMW: 580 },
+    { month: "August", days: 31, demandMU: 2390, hydroMU: 890, centralMU: 1380, ippSolarMU: 330, demandMW: 4490, hydroMW: 1740, centralMW: 2380, ippSolarMW: 610 },
+    { month: "September", days: 30, demandMU: 2410, hydroMU: 780, centralMU: 1390, ippSolarMU: 360, demandMW: 4610, hydroMW: 1640, centralMW: 2390, ippSolarMW: 670 },
+    { month: "October", days: 31, demandMU: 2480, hydroMU: 740, centralMU: 1410, ippSolarMU: 380, demandMW: 4720, hydroMW: 1580, centralMW: 2410, ippSolarMW: 710 },
+    { month: "November", days: 30, demandMU: 2430, hydroMU: 690, centralMU: 1400, ippSolarMU: 390, demandMW: 4650, hydroMW: 1510, centralMW: 2400, ippSolarMW: 730 },
+    { month: "December", days: 31, demandMU: 2560, hydroMU: 620, centralMU: 1420, ippSolarMU: 410, demandMW: 4790, hydroMW: 1410, centralMW: 2390, ippSolarMW: 750 }
   ];
 
   let unitMode = "mu";
@@ -224,7 +235,7 @@
   function showDailyView(idx) {
     selectedMonthIdx = idx;
     document.getElementById("backBtn").classList.remove("hidden");
-    document.getElementById("tableTitle").textContent = `${DATA[idx].month} — Day-Wise KSEB Demand Breakdown`;
+    document.getElementById("tableTitle").textContent = `${DATA[idx].month} — Day-Wise Supply vs. Demand Balance`;
     document.getElementById("tableSubtitle").textContent = `Showing all ${DATA[idx].days} days • Toggle MU (Energy) or MW (Peak Load) at top right`;
     renderTable();
   }
@@ -232,9 +243,16 @@
   function showMonthlyView() {
     selectedMonthIdx = null;
     document.getElementById("backBtn").classList.add("hidden");
-    document.getElementById("tableTitle").textContent = "Kerala Grid — Monthly Demand & Consumption Prediction";
-    document.getElementById("tableSubtitle").textContent = "Click any month on the left for day-wise demand • Click cells to adjust baseline values";
+    document.getElementById("tableTitle").textContent = "Kerala Grid — Supply vs. Demand Prediction (Surplus / Deficit)";
+    document.getElementById("tableSubtitle").textContent = "Click any month on the left for day-wise breakdown • Click cells to adjust supply or demand";
     renderTable();
+  }
+
+  function formatSigned(val, decimals) {
+    const absStr = Math.abs(val).toLocaleString("en-IN", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    if (val > 0.005) return `+${absStr}`;
+    if (val < -0.005) return `−${absStr}`;
+    return "0.00";
   }
 
   function getDailySplit(row, monthIdx) {
@@ -249,15 +267,23 @@
     }
     for (let d = 0; d < row.days; d++) {
       const ratio = weights[d] / weightSum;
-      const muRatio = (row.totalMU * ratio) / (row.totalMU / row.days);
+      const loadFactor = 0.94 + 0.08 * (ratio * row.days);
+      const dMU = Number((row.demandMU * ratio).toFixed(2));
+      const hMU = Number((row.hydroMU * ratio).toFixed(2));
+      const cMU = Number((row.centralMU * ratio).toFixed(2));
+      const iMU = Number((row.ippSolarMU * ratio).toFixed(2));
+      const sMU = Number((hMU + cMU + iMU).toFixed(2));
+
+      const dMW = Math.round(row.demandMW * loadFactor);
+      const hMW = Math.round(row.hydroMW * (0.96 + 0.05 * Math.sin(d)));
+      const cMW = Math.round(row.centralMW * (0.98 + 0.03 * Math.cos(d)));
+      const iMW = Math.round(row.ippSolarMW * (0.92 + 0.10 * Math.sin(d + 1)));
+      const sMW = hMW + cMW + iMW;
+
       days.push({
         day: `Day ${d + 1}`,
-        totalMU: Number((row.totalMU * ratio).toFixed(2)),
-        domesticMU: Number((row.domesticMU * ratio).toFixed(2)),
-        commercialMU: Number((row.commercialMU * ratio).toFixed(2)),
-        industrialMU: Number((row.industrialMU * ratio).toFixed(2)),
-        agriOtherMU: Number((row.agriOtherMU * ratio).toFixed(2)),
-        peakMW: Math.round(row.peakMW * (0.94 + 0.08 * muRatio))
+        demandMU: dMU, hydroMU: hMU, centralMU: cMU, ippSolarMU: iMU, supplyMU: sMU, netMU: Number((sMU - dMU).toFixed(2)),
+        demandMW: dMW, hydroMW: hMW, centralMW: cMW, ippSolarMW: iMW, supplyMW: sMW, netMW: sMW - dMW
       });
     }
     return days;
@@ -266,128 +292,160 @@
     const thead = document.getElementById("tableHead");
     const tbody = document.getElementById("tableBody");
     const tfoot = document.getElementById("tableFoot");
+    const unitLabel = unitMode === "mu" ? "MU" : "MW";
 
-    if (unitMode === "mu") {
-      thead.innerHTML = `<tr>
-        <th>${selectedMonthIdx === null ? "Month" : "Day"}</th>
-        <th>Predicted Total Demand (MU)</th>
-        <th>Domestic & Cooling (MU)</th>
-        <th>Commercial (MU)</th>
-        <th>Industrial HT/EHT (MU)</th>
-        <th>Agri & Others (MU)</th>
-      </tr>`;
-    } else {
-      thead.innerHTML = `<tr>
-        <th>${selectedMonthIdx === null ? "Month" : "Day"}</th>
-        <th>Projected Peak Demand (MW)</th>
-        <th>Evening Peak 18:00–22:00 (MW)</th>
-        <th>Daytime Solar-Window 09:00–16:00 (MW)</th>
-        <th>Off-Peak Night Base Load (MW)</th>
-      </tr>`;
-    }
+    thead.innerHTML = `<tr>
+      <th>${selectedMonthIdx === null ? "Month" : "Day"}</th>
+      <th>Demand (${unitLabel})</th>
+      <th>Hydro (${unitLabel})</th>
+      <th>Central (${unitLabel})</th>
+      <th>IPP/Solar (${unitLabel})</th>
+      <th>Supply (${unitLabel})</th>
+      <th>Surplus / Deficit</th>
+    </tr>`;
 
     let bodyHTML = "";
     if (selectedMonthIdx === null) {
-      let sumTotal = 0, sumDom = 0, sumCom = 0, sumInd = 0, sumAgr = 0, maxPeak = 0;
+      let totDem = 0, totHyd = 0, totCen = 0, totIpp = 0, totSup = 0;
 
       DATA.forEach((r, idx) => {
-        sumTotal += r.totalMU; sumDom += r.domesticMU; sumCom += r.commercialMU; sumInd += r.industrialMU; sumAgr += r.agriOtherMU;
-        if (r.peakMW > maxPeak) maxPeak = r.peakMW;
+        const dem = unitMode === "mu" ? r.demandMU : r.demandMW;
+        const hyd = unitMode === "mu" ? r.hydroMU : r.hydroMW;
+        const cen = unitMode === "mu" ? r.centralMU : r.centralMW;
+        const ipp = unitMode === "mu" ? r.ippSolarMU : r.ippSolarMW;
+        const sup = hyd + cen + ipp;
+        const net = sup - dem;
 
-        if (unitMode === "mu") {
-          bodyHTML += `<tr class="month-row">
-            <td><a class="month-link" onclick="showDailyView(${idx})"><span>${r.month}</span><span>▶</span></a></td>
-            <td><input class="cell-input" type="number" value="${r.totalMU}" onchange="updateMU(${idx}, 'totalMU', this.value)" /></td>
-            <td><input class="cell-input" type="number" value="${r.domesticMU}" onchange="updateMU(${idx}, 'domesticMU', this.value)" /></td>
-            <td><input class="cell-input" type="number" value="${r.commercialMU}" onchange="updateMU(${idx}, 'commercialMU', this.value)" /></td>
-            <td><input class="cell-input" type="number" value="${r.industrialMU}" onchange="updateMU(${idx}, 'industrialMU', this.value)" /></td>
-            <td><input class="cell-input" type="number" value="${r.agriOtherMU}" onchange="updateMU(${idx}, 'agriOtherMU', this.value)" /></td>
-          </tr>`;
-        } else {
-          bodyHTML += `<tr class="month-row">
-            <td><a class="month-link" onclick="showDailyView(${idx})"><span>${r.month}</span><span>▶</span></a></td>
-            <td><input class="cell-input" type="number" value="${r.peakMW}" onchange="updateMW(${idx}, this.value)" /></td>
-            <td>${r.peakMW.toLocaleString("en-IN")}</td>
-            <td>${Math.round(r.peakMW * 0.84).toLocaleString("en-IN")}</td>
-            <td>${Math.round(r.peakMW * 0.66).toLocaleString("en-IN")}</td>
-          </tr>`;
-        }
+        totDem += dem; totHyd += hyd; totCen += cen; totIpp += ipp; totSup += sup;
+        const netClass = net >= 0 ? "surplus" : "deficit";
+        const fKey = unitMode === "mu" ? "MU" : "MW";
+
+        bodyHTML += `<tr class="month-row">
+          <td><a class="month-link" onclick="showDailyView(${idx})"><span>${r.month}</span><span>▶</span></a></td>
+          <td><input class="cell-input" type="number" value="${dem}" onchange="updateVal(${idx}, 'demand${fKey}', this.value)" /></td>
+          <td><input class="cell-input" type="number" value="${hyd}" onchange="updateVal(${idx}, 'hydro${fKey}', this.value)" /></td>
+          <td><input class="cell-input" type="number" value="${cen}" onchange="updateVal(${idx}, 'central${fKey}', this.value)" /></td>
+          <td><input class="cell-input" type="number" value="${ipp}" onchange="updateVal(${idx}, 'ippSolar${fKey}', this.value)" /></td>
+          <td class="supply-col">${sup.toLocaleString("en-IN")}</td>
+          <td class="${netClass}">${formatSigned(net, 0)}</td>
+        </tr>`;
       });
 
       tbody.innerHTML = bodyHTML;
+      const totNet = totSup - totDem;
+      const footClass = totNet >= 0 ? "surplus" : "deficit";
+
       if (unitMode === "mu") {
-        tfoot.innerHTML = `<tr><td>Annual Total (MU)</td><td>${sumTotal.toLocaleString("en-IN")}</td><td>${sumDom.toLocaleString("en-IN")}</td><td>${sumCom.toLocaleString("en-IN")}</td><td>${sumInd.toLocaleString("en-IN")}</td><td>${sumAgr.toLocaleString("en-IN")}</td></tr>`;
+        tfoot.innerHTML = `<tr>
+          <td>Annual Total (MU)</td>
+          <td>${totDem.toLocaleString("en-IN")}</td>
+          <td>${totHyd.toLocaleString("en-IN")}</td>
+          <td>${totCen.toLocaleString("en-IN")}</td>
+          <td>${totIpp.toLocaleString("en-IN")}</td>
+          <td>${totSup.toLocaleString("en-IN")}</td>
+          <td class="${footClass}">${formatSigned(totNet, 0)} MU</td>
+        </tr>`;
       } else {
-        tfoot.innerHTML = `<tr><td>Annual Max Peak</td><td>${maxPeak.toLocaleString("en-IN")} MW</td><td>${maxPeak.toLocaleString("en-IN")} MW</td><td>${Math.round(maxPeak * 0.84).toLocaleString("en-IN")} MW</td><td>${Math.round(maxPeak * 0.66).toLocaleString("en-IN")} MW</td></tr>`;
+        tfoot.innerHTML = `<tr>
+          <td>Monthly Avg (MW)</td>
+          <td>${Math.round(totDem / 12).toLocaleString("en-IN")}</td>
+          <td>${Math.round(totHyd / 12).toLocaleString("en-IN")}</td>
+          <td>${Math.round(totCen / 12).toLocaleString("en-IN")}</td>
+          <td>${Math.round(totIpp / 12).toLocaleString("en-IN")}</td>
+          <td>${Math.round(totSup / 12).toLocaleString("en-IN")}</td>
+          <td class="${footClass}">${formatSigned(Math.round(totNet / 12), 0)} MW</td>
+        </tr>`;
       }
     } else {
       const row = DATA[selectedMonthIdx];
       const daily = getDailySplit(row, selectedMonthIdx);
-      let sTot = 0, sDom = 0, sCom = 0, sInd = 0, sAgr = 0, mPeak = 0;
+      const dec = unitMode === "mu" ? 2 : 0;
+      let sDem = 0, sHyd = 0, sCen = 0, sIpp = 0, sSup = 0;
 
       daily.forEach(d => {
-        sTot += d.totalMU; sDom += d.domesticMU; sCom += d.commercialMU; sInd += d.industrialMU; sAgr += d.agriOtherMU;
-        if (d.peakMW > mPeak) mPeak = d.peakMW;
+        const dem = unitMode === "mu" ? d.demandMU : d.demandMW;
+        const hyd = unitMode === "mu" ? d.hydroMU : d.hydroMW;
+        const cen = unitMode === "mu" ? d.centralMU : d.centralMW;
+        const ipp = unitMode === "mu" ? d.ippSolarMU : d.ippSolarMW;
+        const sup = unitMode === "mu" ? d.supplyMU : d.supplyMW;
+        const net = unitMode === "mu" ? d.netMU : d.netMW;
 
-        if (unitMode === "mu") {
-          bodyHTML += `<tr><td>${d.day}</td><td>${d.totalMU.toFixed(2)}</td><td>${d.domesticMU.toFixed(2)}</td><td>${d.commercialMU.toFixed(2)}</td><td>${d.industrialMU.toFixed(2)}</td><td>${d.agriOtherMU.toFixed(2)}</td></tr>`;
-        } else {
-          bodyHTML += `<tr><td>${d.day}</td><td>${d.peakMW.toLocaleString("en-IN")}</td><td>${d.peakMW.toLocaleString("en-IN")}</td><td>${Math.round(d.peakMW * 0.84).toLocaleString("en-IN")}</td><td>${Math.round(d.peakMW * 0.66).toLocaleString("en-IN")}</td></tr>`;
-        }
+        sDem += dem; sHyd += hyd; sCen += cen; sIpp += ipp; sSup += sup;
+        const netClass = net >= 0 ? "surplus" : "deficit";
+
+        bodyHTML += `<tr>
+          <td>${d.day}</td>
+          <td>${dem.toLocaleString("en-IN", { minimumFractionDigits: dec, maximumFractionDigits: dec })}</td>
+          <td>${hyd.toLocaleString("en-IN", { minimumFractionDigits: dec, maximumFractionDigits: dec })}</td>
+          <td>${cen.toLocaleString("en-IN", { minimumFractionDigits: dec, maximumFractionDigits: dec })}</td>
+          <td>${ipp.toLocaleString("en-IN", { minimumFractionDigits: dec, maximumFractionDigits: dec })}</td>
+          <td class="supply-col">${sup.toLocaleString("en-IN", { minimumFractionDigits: dec, maximumFractionDigits: dec })}</td>
+          <td class="${netClass}">${formatSigned(net, dec)}</td>
+        </tr>`;
       });
 
       tbody.innerHTML = bodyHTML;
+      const mNet = sSup - sDem;
+      const footClass = mNet >= 0 ? "surplus" : "deficit";
+
       if (unitMode === "mu") {
-        tfoot.innerHTML = `<tr><td>${row.month} Total</td><td>${sTot.toFixed(2)}</td><td>${sDom.toFixed(2)}</td><td>${sCom.toFixed(2)}</td><td>${sInd.toFixed(2)}</td><td>${sAgr.toFixed(2)}</td></tr>`;
+        tfoot.innerHTML = `<tr>
+          <td>${row.month} Total</td>
+          <td>${sDem.toFixed(2)}</td>
+          <td>${sHyd.toFixed(2)}</td>
+          <td>${sCen.toFixed(2)}</td>
+          <td>${sIpp.toFixed(2)}</td>
+          <td>${sSup.toFixed(2)}</td>
+          <td class="${footClass}">${formatSigned(mNet, 2)} MU</td>
+        </tr>`;
       } else {
-        tfoot.innerHTML = `<tr><td>${row.month} Max Peak</td><td>${mPeak.toLocaleString("en-IN")} MW</td><td>${mPeak.toLocaleString("en-IN")} MW</td><td>${Math.round(mPeak * 0.84).toLocaleString("en-IN")} MW</td><td>${Math.round(mPeak * 0.66).toLocaleString("en-IN")} MW</td></tr>`;
+        const n = row.days;
+        tfoot.innerHTML = `<tr>
+          <td>${row.month} Avg (MW)</td>
+          <td>${Math.round(sDem / n).toLocaleString("en-IN")}</td>
+          <td>${Math.round(sHyd / n).toLocaleString("en-IN")}</td>
+          <td>${Math.round(sCen / n).toLocaleString("en-IN")}</td>
+          <td>${Math.round(sIpp / n).toLocaleString("en-IN")}</td>
+          <td>${Math.round(sSup / n).toLocaleString("en-IN")}</td>
+          <td class="${footClass}">${formatSigned(Math.round(mNet / n), 0)} MW</td>
+        </tr>`;
       }
     }
   }
 
-  function updateMU(idx, field, val) {
+  function updateVal(idx, field, val) {
     const v = parseFloat(val);
-    if (!isNaN(v) && v >= 0) {
-      DATA[idx][field] = v;
-      if (field !== "totalMU") {
-        DATA[idx].totalMU = Number((DATA[idx].domesticMU + DATA[idx].commercialMU + DATA[idx].industrialMU + DATA[idx].agriOtherMU).toFixed(2));
-      }
-    }
-    renderTable();
-  }
-
-  function updateMW(idx, val) {
-    const v = parseFloat(val);
-    if (!isNaN(v) && v >= 0) DATA[idx].peakMW = Math.round(v);
+    if (!isNaN(v) && v >= 0) DATA[idx][field] = unitMode === "mu" ? Number(v.toFixed(2)) : Math.round(v);
     renderTable();
   }
 
   function exportCSV() {
-    const rows = [];
+    const u = unitMode.toUpperCase();
+    const rows = [`${selectedMonthIdx === null ? "Month" : "Day"},Predicted_Demand_${u},Hydro_Gen_${u},Central_Share_${u},IPP_Solar_${u},Total_Supply_${u},Net_Surplus_Deficit_${u}`];
     if (selectedMonthIdx === null) {
-      if (unitMode === "mu") {
-        rows.push("Month,Total_Demand_MU,Domestic_MU,Commercial_MU,Industrial_MU,Agri_Other_MU");
-        DATA.forEach(r => rows.push(`${r.month},${r.totalMU},${r.domesticMU},${r.commercialMU},${r.industrialMU},${r.agriOtherMU}`));
-      } else {
-        rows.push("Month,Peak_Demand_MW,Evening_Peak_MW,Daytime_MW,Night_Base_MW");
-        DATA.forEach(r => rows.push(`${r.month},${r.peakMW},${r.peakMW},${Math.round(r.peakMW * 0.84)},${Math.round(r.peakMW * 0.66)}`));
-      }
+      DATA.forEach(r => {
+        const dem = unitMode === "mu" ? r.demandMU : r.demandMW;
+        const hyd = unitMode === "mu" ? r.hydroMU : r.hydroMW;
+        const cen = unitMode === "mu" ? r.centralMU : r.centralMW;
+        const ipp = unitMode === "mu" ? r.ippSolarMU : r.ippSolarMW;
+        const sup = hyd + cen + ipp;
+        rows.push(`${r.month},${dem},${hyd},${cen},${ipp},${sup},${(sup - dem).toFixed(2)}`);
+      });
     } else {
       const row = DATA[selectedMonthIdx];
-      const daily = getDailySplit(row, selectedMonthIdx);
-      if (unitMode === "mu") {
-        rows.push("Day,Total_Demand_MU,Domestic_MU,Commercial_MU,Industrial_MU,Agri_Other_MU");
-        daily.forEach(d => rows.push(`${d.day},${d.totalMU},${d.domesticMU},${d.commercialMU},${d.industrialMU},${d.agriOtherMU}`));
-      } else {
-        rows.push("Day,Peak_Demand_MW,Evening_Peak_MW,Daytime_MW,Night_Base_MW");
-        daily.forEach(d => rows.push(`${d.day},${d.peakMW},${d.peakMW},${Math.round(d.peakMW * 0.84)},${Math.round(d.peakMW * 0.66)}`));
-      }
+      getDailySplit(row, selectedMonthIdx).forEach(d => {
+        if (unitMode === "mu") {
+          rows.push(`${d.day},${d.demandMU},${d.hydroMU},${d.centralMU},${d.ippSolarMU},${d.supplyMU},${d.netMU}`);
+        } else {
+          rows.push(`${d.day},${d.demandMW},${d.hydroMW},${d.centralMW},${d.ippSolarMW},${d.supplyMW},${d.netMW}`);
+        }
+      });
     }
     const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `KSEB_Demand_Prediction_${selectedMonthIdx === null ? "Annual" : DATA[selectedMonthIdx].month}_${unitMode.toUpperCase()}.csv`;
+    a.download = `KSEB_Supply_vs_Demand_${selectedMonthIdx === null ? "Annual" : DATA[selectedMonthIdx].month}_${u}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }

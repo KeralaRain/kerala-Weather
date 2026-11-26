@@ -524,9 +524,16 @@ elif active_tab == "📈 Weather vs. KSEB Demand":
 
     st.divider()
     st.subheader("📈 KSEB Grid — Monthly & Day-Wise Demand Prediction")
-    _dem_html = _DemPath(__file__).resolve().parent / "kseb_demand_prediction.html"
-    if _dem_html.exists():
-        _dem_components.html(_dem_html.read_text(encoding="utf-8"), height=540, scrolling=True)
+    from kseb_db_bridge import render_live_demand_table as _render_live_dem
+    _dem_rendered = _render_live_dem("kseb_demand_prediction.html")
+    if _dem_rendered:
+        _dem_components.html(_dem_rendered, height=560, scrolling=True)
+
+    from kseb_db_bridge import render_live_tod_table as _render_live_tod
+    st.subheader("🕒 KSEB Demand Prediction by Time Zone (Day / Peak / Off-Peak)")
+    _tod_rendered = _render_live_tod("kseb_tod_demand.html")
+    if _tod_rendered:
+        _dem_components.html(_tod_rendered, height=520, scrolling=True)
 
 with st.sidebar:
     st.divider()

@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KSEB Time-of-Day Demand & Surplus/Deficit</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #cbd5e1;
+      --border-light: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #475569;
+      --primary: #1d4ed8;
+      --primary-hover: #1e40af;
+      --total-bg: #f1f5f9;
+      --hover-row: #f0f9ff;
+      --surplus-bg: #ecfdf5;
+      --surplus-text: #047857;
+      --deficit-bg: #fef2f2;
+      --deficit-text: #b91c1c;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 6px;
+      font-size: 11px;
+    }
+    .container {
+      max-width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      overflow: hidden;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 10px;
+      background: #f1f5f9;
+      border-bottom: 1px solid var(--border);
+    }
+    .toolbar-left, .toolbar-right {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+    .title-group h1 { font-size: 13px; font-weight: 700; color: var(--text); }
+    .title-group p { font-size: 10.5px; color: var(--text-muted); }
+    .unit-selector {
+      display: inline-flex;
+      background: #e2e8f0;
+      padding: 2px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .unit-btn {
+      padding: 3px 8px;
+      font-size: 10.5px;
+      font-weight: 600;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .unit-btn.active {
+      background: var(--primary);
+      color: #ffffff;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+    }
+    .action-btn {
+      padding: 4px 8px;
+      font-size: 10.5px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: #ffffff;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .action-btn:hover { background: #e2e8f0; }
+    .back-btn { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .back-btn:hover { background: var(--primary-hover); }
+    .table-wrapper { width: 100%; overflow-x: auto; }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      table-layout: fixed;
+      font-variant-numeric: tabular-nums;
+    }
+    th, td {
+      border-right: 1px solid var(--border-light);
+      border-bottom: 1px solid var(--border-light);
+      padding: 4px 4px;
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 10.5px;
+    }
+    th:first-child, td:first-child {
+      width: 82px;
+      text-align: left;
+      background: #f8fafc;
+      border-right: 2px solid var(--border);
+      font-weight: 600;
+      padding-left: 6px;
+    }
+    thead th {
+      background: #f1f5f9;
+      border-bottom: 1px solid var(--border);
+      text-align: right;
+      font-weight: 700;
+      line-height: 1.2;
+      white-space: normal;
+    }
+    thead th:first-child { text-align: left; }
+    tbody tr.month-row:hover td { background-color: var(--hover-row); }
+    .month-link {
+      color: var(--primary);
+      cursor: pointer;
+      text-decoration: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .month-link:hover { text-decoration: underline; }
+    .cell-input {
+      width: 100%;
+      border: 1px solid transparent;
+      background: transparent;
+      text-align: right;
+      font-size: 10.5px;
+      font-family: inherit;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+      padding: 1px 2px;
+      border-radius: 2px;
+    }
+    .cell-input:hover, .cell-input:focus {
+      border-color: var(--primary);
+      background: #ffffff;
+      outline: none;
+    }
+    .day-badge { background: #eff6ff; color: #1d4ed8; font-weight: 600; }
+    .peak-badge { background: #fef2f2; color: #b91c1c; font-weight: 700; }
+    .offpeak-badge { background: #f0fdf4; color: #15803d; font-weight: 600; }
+    .supply-col { background: #f8fafc; font-weight: 600; }
+    .surplus { background-color: var(--surplus-bg) !important; color: var(--surplus-text); font-weight: 700; }
+    .deficit { background-color: var(--deficit-bg) !important; color: var(--deficit-text); font-weight: 700; }
+    tfoot td {
+      background: var(--total-bg);
+      font-weight: 700;
+      border-top: 2px solid var(--border);
+      border-bottom: none;
+    }
+    tfoot td:first-child { background: #e2e8f0; }
+    .hidden { display: none !important; }
+    .hint-bar {
+      padding: 5px 10px;
+      font-size: 10.5px;
+      color: var(--text-muted);
+      background: #fff;
+      border-top: 1px solid var(--border-light);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <button id="backBtn" class="action-btn back-btn hidden" onclick="showMonthlyView()">← All Months</button>
+      <div class="title-group">
+        <h1 id="tableTitle">KSEB Time-of-Day Demand & Surplus/Deficit</h1>
+        <p id="tableSubtitle">Day 08:00–18:00 • Evening Peak 18:00–23:30 • Off-Peak 23:30–08:00 • Click month for daily data</p>
+      </div>
+    </div>
+    <div class="toolbar-right">
+      <div class="unit-selector" role="group" aria-label="Select unit">
+        <button class="unit-btn active" data-unit="mw" onclick="setUnit('mw', this)">MW (Load)</button>
+        <button class="unit-btn" data-unit="mu" onclick="setUnit('mu', this)">MU (Energy)</button>
+        <button class="unit-btn" data-unit="pct" onclick="setUnit('pct', this)">% Share</button>
+      </div>
+      <button class="action-btn" onclick="exportCSV()">Export CSV</button>
+    </div>
+  </div>
+  <div class="table-wrapper">
+    <table>
+      <thead id="tableHead"></thead>
+      <tbody id="tableBody"></tbody>
+      <tfoot id="tableFoot"></tfoot>
+    </table>
+  </div>
+  <div class="hint-bar">
+    <span><strong>Day:</strong> 08:00–18:00 (10h) | <strong>Peak:</strong> 18:00–23:30 (5.5h) | <strong>Off-Peak:</strong> 23:30–08:00 (8.5h) | <strong style="color:#047857;">+Surplus</strong> / <strong style="color:#b91c1c;">−Deficit</strong> = Supply − Demand</span>
+    <span id="dbStatus">KSEB ToD Zone Balance</span>
+  </div>
+</div>
+<script>
+  let TOD_DATA = [
+    { month: "January", days: 31, dayMU: 1060, peakMU: 720, offPeakMU: 760, supplyMU: 2410, peakSupplyMW: 4410 },
+    { month: "February", days: 28, dayMU: 1045, peakMU: 705, offPeakMU: 740, supplyMU: 2300, peakSupplyMW: 4440 },
+    { month: "March", days: 31, dayMU: 1240, peakMU: 815, offPeakMU: 865, supplyMU: 2600, peakSupplyMW: 4770 },
+    { month: "April", days: 30, dayMU: 1270, peakMU: 830, offPeakMU: 880, supplyMU: 2570, peakSupplyMW: 4820 },
+    { month: "May", days: 31, dayMU: 1225, peakMU: 805, offPeakMU: 860, supplyMU: 2580, peakSupplyMW: 4790 },
+    { month: "June", days: 30, dayMU: 990, peakMU: 675, offPeakMU: 715, supplyMU: 2490, peakSupplyMW: 4630 },
+    { month: "July", days: 31, dayMU: 970, peakMU: 665, offPeakMU: 705, supplyMU: 2590, peakSupplyMW: 4730 },
+    { month: "August", days: 31, dayMU: 995, peakMU: 680, offPeakMU: 715, supplyMU: 2600, peakSupplyMW: 4730 },
+    { month: "September", days: 30, dayMU: 1005, peakMU: 685, offPeakMU: 720, supplyMU: 2530, peakSupplyMW: 4700 },
+    { month: "October", days: 31, dayMU: 1035, peakMU: 705, offPeakMU: 740, supplyMU: 2530, peakSupplyMW: 4700 },
+    { month: "November", days: 30, dayMU: 1010, peakMU: 690, offPeakMU: 730, supplyMU: 2480, peakSupplyMW: 4640 },
+    { month: "December", days: 31, dayMU: 1070, peakMU: 725, offPeakMU: 765, supplyMU: 2450, peakSupplyMW: 4550 }
+  ];
+
+  let unitMode = "mw"; // 'mw' | 'mu' | 'pct'
+  let selectedMonthIdx = null;
+
+  function setUnit(mode, btn) {
+    unitMode = mode;
+    document.querySelectorAll(".unit-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    renderTable();
+  }
+
+  function showDailyView(idx) {
+    selectedMonthIdx = idx;
+    document.getElementById("backBtn").classList.remove("hidden");
+    document.getElementById("tableTitle").textContent = `${TOD_DATA[idx].month} — Day-Wise ToD Demand & Surplus/Deficit`;
+    document.getElementById("tableSubtitle").textContent = `Showing all ${TOD_DATA[idx].days} days • Day (08–18h), Evening Peak (18–23:30), Off-Peak (23:30–08h)`;
+    renderTable();
+  }
+
+  function showMonthlyView() {
+    selectedMonthIdx = null;
+    document.getElementById("backBtn").classList.add("hidden");
+    document.getElementById("tableTitle").textContent = "KSEB Time-of-Day Demand & Surplus/Deficit";
+    document.getElementById("tableSubtitle").textContent = "Day 08:00–18:00 • Evening Peak 18:00–23:30 • Off-Peak 23:30–08:00 • Click month for daily data";
+    renderTable();
+  }
+
+  function formatSigned(val, decimals) {
+    const absStr = Math.abs(val).toLocaleString("en-IN", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    if (val > 0.005) return `+${absStr}`;
+    if (val < -0.005) return `−${absStr}`;
+    return decimals > 0 ? "0.00" : "0";
+  }
+
+  function getDailySplit(row, monthIdx) {
+    const days = [];
+    let weightSum = 0;
+    const weights = [];
+    for (let d = 0; d < row.days; d++) {
+      const isSunday = (d + monthIdx) % 7 === 6;
+      const w = (isSunday ? 0.91 : 1.02) + 0.05 * Math.sin((d / row.days) * Math.PI * 2);
+      weights.push(w);
+      weightSum += w;
+    }
+    for (let d = 0; d < row.days; d++) {
+      const ratio = weights[d] / weightSum;
+      const supRatio = (1 / row.days) * (0.98 + 0.03 * Math.cos(d + monthIdx));
+      days.push({
+        day: `Day ${d + 1}`,
+        dayMU: Number((row.dayMU * ratio).toFixed(2)),
+        peakMU: Number((row.peakMU * ratio).toFixed(2)),
+        offPeakMU: Number((row.offPeakMU * ratio).toFixed(2)),
+        supplyMU: Number((row.supplyMU * supRatio).toFixed(2)),
+        peakSupplyMW: Math.round(row.peakSupplyMW * (0.98 + 0.03 * Math.cos(d + monthIdx)))
+      });
+    }
+    return days;
+  }
+  function muToAvgMW(mu, totalHours) {
+    return totalHours > 0 ? Math.round((mu * 1000) / totalHours) : 0;
+  }
+
+  function renderTable() {
+    const thead = document.getElementById("tableHead");
+    const tbody = document.getElementById("tableBody");
+    const tfoot = document.getElementById("tableFoot");
+    const u = unitMode === "mu" ? "MU" : unitMode === "mw" ? "MW" : "%";
+
+    thead.innerHTML = `<tr>
+      <th>${selectedMonthIdx === null ? "Month" : "Day"}</th>
+      <th>Day 08–18h<br>(${u})</th>
+      <th>Peak 18–23:30<br>(${u})</th>
+      <th>Off-Peak 23:30–08<br>(${u})</th>
+      <th>Total Demand<br>(${u})</th>
+      <th>Supply<br>(${unitMode === "pct" ? "MU" : u})</th>
+      <th>Surplus /<br>Deficit</th>
+    </tr>`;
+
+    let bodyHTML = "";
+    if (selectedMonthIdx === null) {
+      let totDay = 0, totPeak = 0, totOff = 0, totSupMU = 0, totPeakSupMW = 0, totalDays = 0;
+
+      TOD_DATA.forEach((r, idx) => {
+        const demMU = r.dayMU + r.peakMU + r.offPeakMU;
+        totDay += r.dayMU; totPeak += r.peakMU; totOff += r.offPeakMU;
+        totSupMU += r.supplyMU; totPeakSupMW += r.peakSupplyMW; totalDays += r.days;
+
+        if (unitMode === "mu") {
+          const netMU = r.supplyMU - demMU;
+          const cls = netMU >= 0 ? "surplus" : "deficit";
+          bodyHTML += `<tr class="month-row">
+            <td><a class="month-link" onclick="showDailyView(${idx})"><span>${r.month}</span><span>▶</span></a></td>
+            <td class="day-badge"><input class="cell-input" type="number" value="${r.dayMU}" onchange="updateVal(${idx}, 'dayMU', this.value)" /></td>
+            <td class="peak-badge"><input class="cell-input" type="number" value="${r.peakMU}" onchange="updateVal(${idx}, 'peakMU', this.value)" /></td>
+            <td class="offpeak-badge"><input class="cell-input" type="number" value="${r.offPeakMU}" onchange="updateVal(${idx}, 'offPeakMU', this.value)" /></td>
+            <td><strong>${demMU.toLocaleString("en-IN", { maximumFractionDigits: 1 })}</strong></td>
+            <td class="supply-col"><input class="cell-input" type="number" value="${r.supplyMU}" onchange="updateVal(${idx}, 'supplyMU', this.value)" /></td>
+            <td class="${cls}">${formatSigned(netMU, 0)}</td>
+          </tr>`;
+        } else if (unitMode === "mw") {
+          const dMW = muToAvgMW(r.dayMU, r.days * 10);
+          const pMW = muToAvgMW(r.peakMU, r.days * 5.5);
+          const oMW = muToAvgMW(r.offPeakMU, r.days * 8.5);
+          const avgDemMW = muToAvgMW(demMU, r.days * 24);
+          const netPeakMW = r.peakSupplyMW - pMW;
+          const cls = netPeakMW >= 0 ? "surplus" : "deficit";
+          bodyHTML += `<tr class="month-row">
+            <td><a class="month-link" onclick="showDailyView(${idx})"><span>${r.month}</span><span>▶</span></a></td>
+            <td class="day-badge">${dMW.toLocaleString("en-IN")}</td>
+            <td class="peak-badge">${pMW.toLocaleString("en-IN")}</td>
+            <td class="offpeak-badge">${oMW.toLocaleString("en-IN")}</td>
+            <td><strong>${avgDemMW.toLocaleString("en-IN")}</strong></td>
+            <td class="supply-col"><input class="cell-input" type="number" value="${r.peakSupplyMW}" onchange="updateVal(${idx}, 'peakSupplyMW', this.value)" /></td>
+            <td class="${cls}">${formatSigned(netPeakMW, 0)}</td>
+          </tr>`;
+        } else {
+          const dPct = ((r.dayMU / demMU) * 100).toFixed(1);
+          const pPct = ((r.peakMU / demMU) * 100).toFixed(1);
+          const oPct = ((r.offPeakMU / demMU) * 100).toFixed(1);
+          const netMU = r.supplyMU - demMU;
+          const cls = netMU >= 0 ? "surplus" : "deficit";
+          bodyHTML += `<tr class="month-row">
+            <td><a class="month-link" onclick="showDailyView(${idx})"><span>${r.month}</span><span>▶</span></a></td>
+            <td class="day-badge">${dPct}%</td>
+            <td class="peak-badge">${pPct}%</td>
+            <td class="offpeak-badge">${oPct}%</td>
+            <td><strong>100.0%</strong></td>
+            <td class="supply-col">${r.supplyMU.toLocaleString("en-IN")}</td>
+            <td class="${cls}">${formatSigned(netMU, 0)} MU</td>
+          </tr>`;
+        }
+      });
+      tbody.innerHTML = bodyHTML;
+      const grandDemMU = totDay + totPeak + totOff;
+      if (unitMode === "mu") {
+        const netYr = totSupMU - grandDemMU;
+        tfoot.innerHTML = `<tr>
+          <td>Annual Total</td>
+          <td>${totDay.toLocaleString("en-IN", { maximumFractionDigits: 1 })}</td>
+          <td>${totPeak.toLocaleString("en-IN", { maximumFractionDigits: 1 })}</td>
+          <td>${totOff.toLocaleString("en-IN", { maximumFractionDigits: 1 })}</td>
+          <td>${grandDemMU.toLocaleString("en-IN", { maximumFractionDigits: 1 })}</td>
+          <td>${totSupMU.toLocaleString("en-IN", { maximumFractionDigits: 1 })}</td>
+          <td class="${netYr >= 0 ? "surplus" : "deficit"}">${formatSigned(netYr, 0)} MU</td>
+        </tr>`;
+      } else if (unitMode === "mw") {
+        const avgP = muToAvgMW(totPeak, totalDays * 5.5);
+        const avgSup = Math.round(totPeakSupMW / 12);
+        const netAvg = avgSup - avgP;
+        tfoot.innerHTML = `<tr>
+          <td>Annual Avg</td>
+          <td>${muToAvgMW(totDay, totalDays * 10).toLocaleString("en-IN")}</td>
+          <td>${avgP.toLocaleString("en-IN")}</td>
+          <td>${muToAvgMW(totOff, totalDays * 8.5).toLocaleString("en-IN")}</td>
+          <td>${muToAvgMW(grandDemMU, totalDays * 24).toLocaleString("en-IN")}</td>
+          <td>${avgSup.toLocaleString("en-IN")}</td>
+          <td class="${netAvg >= 0 ? "surplus" : "deficit"}">${formatSigned(netAvg, 0)} MW</td>
+        </tr>`;
+      } else {
+        const netYr = totSupMU - grandDemMU;
+        tfoot.innerHTML = `<tr>
+          <td>Annual Share</td>
+          <td>${((totDay / grandDemMU) * 100).toFixed(1)}%</td>
+          <td>${((totPeak / grandDemMU) * 100).toFixed(1)}%</td>
+          <td>${((totOff / grandDemMU) * 100).toFixed(1)}%</td>
+          <td>100.0%</td>
+          <td>${totSupMU.toLocaleString("en-IN")}</td>
+          <td class="${netYr >= 0 ? "surplus" : "deficit"}">${formatSigned(netYr, 0)} MU</td>
+        </tr>`;
+      }
+    } else {
+      const row = TOD_DATA[selectedMonthIdx];
+      const daily = getDailySplit(row, selectedMonthIdx);
+      let sDay = 0, sPeak = 0, sOff = 0, sSup = 0, sPeakSup = 0;
+
+      daily.forEach(d => {
+        const dTot = d.dayMU + d.peakMU + d.offPeakMU;
+        sDay += d.dayMU; sPeak += d.peakMU; sOff += d.offPeakMU; sSup += d.supplyMU; sPeakSup += d.peakSupplyMW;
+
+        if (unitMode === "mu") {
+          const netD = d.supplyMU - dTot;
+          bodyHTML += `<tr>
+            <td>${d.day}</td>
+            <td class="day-badge">${d.dayMU.toFixed(2)}</td>
+            <td class="peak-badge">${d.peakMU.toFixed(2)}</td>
+            <td class="offpeak-badge">${d.offPeakMU.toFixed(2)}</td>
+            <td><strong>${dTot.toFixed(2)}</strong></td>
+            <td class="supply-col">${d.supplyMU.toFixed(2)}</td>
+            <td class="${netD >= 0 ? "surplus" : "deficit"}">${formatSigned(netD, 2)}</td>
+          </tr>`;
+        } else if (unitMode === "mw") {
+          const pMW = muToAvgMW(d.peakMU, 5.5);
+          const netMW = d.peakSupplyMW - pMW;
+          bodyHTML += `<tr>
+            <td>${d.day}</td>
+            <td class="day-badge">${muToAvgMW(d.dayMU, 10).toLocaleString("en-IN")}</td>
+            <td class="peak-badge">${pMW.toLocaleString("en-IN")}</td>
+            <td class="offpeak-badge">${muToAvgMW(d.offPeakMU, 8.5).toLocaleString("en-IN")}</td>
+            <td><strong>${muToAvgMW(dTot, 24).toLocaleString("en-IN")}</strong></td>
+            <td class="supply-col">${d.peakSupplyMW.toLocaleString("en-IN")}</td>
+            <td class="${netMW >= 0 ? "surplus" : "deficit"}">${formatSigned(netMW, 0)}</td>
+          </tr>`;
+        } else {
+          const netD = d.supplyMU - dTot;
+          bodyHTML += `<tr>
+            <td>${d.day}</td>
+            <td class="day-badge">${((d.dayMU / dTot) * 100).toFixed(1)}%</td>
+            <td class="peak-badge">${((d.peakMU / dTot) * 100).toFixed(1)}%</td>
+            <td class="offpeak-badge">${((d.offPeakMU / dTot) * 100).toFixed(1)}%</td>
+            <td><strong>100.0%</strong></td>
+            <td class="supply-col">${d.supplyMU.toFixed(2)}</td>
+            <td class="${netD >= 0 ? "surplus" : "deficit"}">${formatSigned(netD, 2)}</td>
+          </tr>`;
+        }
+      });
+      tbody.innerHTML = bodyHTML;
+      const mTot = sDay + sPeak + sOff;
+      if (unitMode === "mu") {
+        const mNet = sSup - mTot;
+        tfoot.innerHTML = `<tr><td>${row.month} Total</td><td>${sDay.toFixed(2)}</td><td>${sPeak.toFixed(2)}</td><td>${sOff.toFixed(2)}</td><td>${mTot.toFixed(2)}</td><td>${sSup.toFixed(2)}</td><td class="${mNet >= 0 ? "surplus" : "deficit"}">${formatSigned(mNet, 2)}</td></tr>`;
+      } else if (unitMode === "mw") {
+        const avgP = muToAvgMW(sPeak, row.days * 5.5);
+        const avgS = Math.round(sPeakSup / row.days);
+        const mNetMW = avgS - avgP;
+        tfoot.innerHTML = `<tr><td>${row.month} Avg</td><td>${muToAvgMW(sDay, row.days * 10).toLocaleString("en-IN")}</td><td>${avgP.toLocaleString("en-IN")}</td><td>${muToAvgMW(sOff, row.days * 8.5).toLocaleString("en-IN")}</td><td>${muToAvgMW(mTot, row.days * 24).toLocaleString("en-IN")}</td><td>${avgS.toLocaleString("en-IN")}</td><td class="${mNetMW >= 0 ? "surplus" : "deficit"}">${formatSigned(mNetMW, 0)}</td></tr>`;
+      } else {
+        const mNet = sSup - mTot;
+        tfoot.innerHTML = `<tr><td>${row.month} Share</td><td>${((sDay / mTot) * 100).toFixed(1)}%</td><td>${((sPeak / mTot) * 100).toFixed(1)}%</td><td>${((sOff / mTot) * 100).toFixed(1)}%</td><td>100.0%</td><td>${sSup.toFixed(2)}</td><td class="${mNet >= 0 ? "surplus" : "deficit"}">${formatSigned(mNet, 2)}</td></tr>`;
+      }
+    }
+  }
+
+  function updateVal(idx, field, val) {
+    const v = parseFloat(val);
+    if (!isNaN(v) && v >= 0) TOD_DATA[idx][field] = unitMode === "mu" ? Number(v.toFixed(2)) : Math.round(v);
+    renderTable();
+  }
+
+  function exportCSV() {
+    const u = unitMode.toUpperCase();
+    const rows = [`${selectedMonthIdx === null ? "Month" : "Day"},Day_0800_1800_${u},EveningPeak_1800_2330_${u},OffPeak_2330_0800_${u},Total_Demand_${u},Supply_${u},Surplus_Deficit_${u}`];
+    if (selectedMonthIdx === null) {
+      TOD_DATA.forEach(r => {
+        const tot = r.dayMU + r.peakMU + r.offPeakMU;
+        if (unitMode === "mu") rows.push(`${r.month},${r.dayMU},${r.peakMU},${r.offPeakMU},${tot.toFixed(2)},${r.supplyMU},${(r.supplyMU - tot).toFixed(2)}`);
+        else if (unitMode === "mw") {
+          const pMW = muToAvgMW(r.peakMU, r.days * 5.5);
+          rows.push(`${r.month},${muToAvgMW(r.dayMU, r.days*10)},${pMW},${muToAvgMW(r.offPeakMU, r.days*8.5)},${muToAvgMW(tot, r.days*24)},${r.peakSupplyMW},${r.peakSupplyMW - pMW}`);
+        } else rows.push(`${r.month},${((r.dayMU/tot)*100).toFixed(1)},${((r.peakMU/tot)*100).toFixed(1)},${((r.offPeakMU/tot)*100).toFixed(1)},100.0,${r.supplyMU},${(r.supplyMU - tot).toFixed(2)}`);
+      });
+    } else {
+      const row = TOD_DATA[selectedMonthIdx];
+      getDailySplit(row, selectedMonthIdx).forEach(d => {
+        const tot = d.dayMU + d.peakMU + d.offPeakMU;
+        if (unitMode === "mu") rows.push(`${d.day},${d.dayMU},${d.peakMU},${d.offPeakMU},${tot.toFixed(2)},${d.supplyMU},${(d.supplyMU - tot).toFixed(2)}`);
+        else if (unitMode === "mw") {
+          const pMW = muToAvgMW(d.peakMU, 5.5);
+          rows.push(`${d.day},${muToAvgMW(d.dayMU, 10)},${pMW},${muToAvgMW(d.offPeakMU, 8.5)},${muToAvgMW(tot, 24)},${d.peakSupplyMW},${d.peakSupplyMW - pMW}`);
+        } else rows.push(`${d.day},${((d.dayMU/tot)*100).toFixed(1)},${((d.peakMU/tot)*100).toFixed(1)},${((d.offPeakMU/tot)*100).toFixed(1)},100.0,${d.supplyMU},${(d.supplyMU - tot).toFixed(2)}`);
+      });
+    }
+    const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `KSEB_ToD_Surplus_Deficit_${selectedMonthIdx === null ? "Annual" : TOD_DATA[selectedMonthIdx].month}_${u}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  renderTable();
+</script>
+</body>
+</html>
